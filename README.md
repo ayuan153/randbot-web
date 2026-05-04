@@ -36,10 +36,148 @@ Like a chess engine overlay — shows the top-N highest expected-value plays eac
 ```bash
 npm install
 npm run build
-# Load dist/ as unpacked extension in chrome://extensions
 ```
 
-Then play a Gen 9 Random Battle — suggestions appear in the overlay each turn.
+Then load the extension in Chrome and play a battle — see [Live Testing](#live-testing) below.
+
+## Live Testing
+
+### 1. Build the extension
+
+```bash
+npm install
+npm run build
+```
+
+This produces `dist/` — a ready-to-load Chrome extension.
+
+### 2. Load in Chrome
+
+1. Open `chrome://extensions` in Chrome
+2. Enable **Developer mode** (toggle in top-right)
+3. Click **Load unpacked**
+4. Select the `dist/` folder inside this project
+
+You should see "Randbats Bot" appear in your extensions list. Note the extension ID (you'll need it for debugging).
+
+### 3. Play a battle
+
+1. Go to [play.pokemonshowdown.com](https://play.pokemonshowdown.com/)
+2. Log in (or play as guest)
+3. Start a **Gen 9 Random Battle** (Battle! → Random Battle)
+4. Once the battle starts and your first turn begins, the overlay panel should appear in the bottom-right corner
+
+### 4. What to look for
+
+- **Overlay panel**: Dark floating panel labeled "⚔️ randbats-bot" with turn number and eval time
+- **Ranked suggestions**: Each available move/switch scored 0–100 with color coding (green/yellow/red)
+- **Details**: KO%, damage%, and other tactical info below each suggestion
+- **Updates each turn**: Panel refreshes when a new `|request|` is received
+
+### 5. Debugging
+
+Open DevTools on the Showdown page (`F12` or `Cmd+Opt+I`):
+
+- **Console tab**: Look for `[randbats-bot]` log messages:
+  - `[randbats-bot] Hook installed` — inject script is working
+  - `[randbats-bot] Content script loaded` — content script is running
+  - `[randbats-bot] Suggestions: [...]` — eval results are flowing
+
+- **Service worker logs**: Go to `chrome://extensions` → click "service worker" link under Randbats Bot → opens a separate DevTools for the background script
+
+- **Common issues**:
+  - No overlay? Check console for errors. The hook waits for `window.app` — if PS hasn't loaded yet, wait a moment and refresh.
+  - Extension not activating? Verify the URL matches `*://play.pokemonshowdown.com/*` or `*://*.psim.us/*`.
+  - Stale code? After rebuilding (`npm run build`), go to `chrome://extensions` and click the refresh ↻ icon on the extension, then reload the PS page.
+
+### 6. Rebuild loop
+
+```bash
+# Make changes, then:
+npm run build
+# Go to chrome://extensions → click ↻ on Randbats Bot → reload the PS page
+```
+
+For faster iteration, use watch mode:
+```bash
+npm run dev   # rebuilds on file changes
+# Still need to refresh the extension + page after each rebuild
+```
+
+## Testing
+
+### Test pyramid
+
+| Layer | Tool | What it tests | Run with |
+|-------|------|---------------|----------|
+| **Unit** | Vitest | Scoring, minimax, damage calc, opponent model, snapshot parsing | `npm test` |
+| **Fixture** | Vitest + replay data | Snapshot extraction against real PS protocol | `npm test` |
+| **Integration** | Playwright + local PS server | Full extension flow: load → battle → suggestions appear | `npm run test:e2e` (planned) |
+
+### Unit tests (current)
+
+```bash
+npm test              # run once
+npm run test:watch    # watch mode
+```
+
+Tests cover:
+- `snapshot.test.ts` — condition/details parsing, action extraction, format derivation
+- `opponent-model.test.ts` — Bayesian set narrowing on reveal events
+- `scoring.test.ts` — heuristic evaluation for symmetric/asymmetric states
+
+### Replay fixture tests (planned)
+
+Download real battle protocol from `replay.pokemonshowdown.com` and feed it through our parsing:
+
+```bash
+# Download a replay's raw protocol
+curl -L https://replay.pokemonshowdown.com/<replay-id>.log > test/fixtures/replay-1.log
+
+# Or use the JSON API for structured data
+curl -L https://replay.pokemonshowdown.com/<replay-id>.json > test/fixtures/replay-1.json
+```
+
+These fixtures let us test snapshot extraction and opponent model tracking against real game data without a live server.
+
+### Integration tests (planned)
+
+Full end-to-end with a local Pokemon Showdown server:
+
+```bash
+# 1. Clone and start local PS server
+git clone https://github.com/smogon/pokemon-showdown.git /tmp/ps-server
+cd /tmp/ps-server && npm install && node pokemon-showdown start --no-security
+
+# 2. Run integration tests (Playwright loads extension, navigates to localhost:8000)
+npm run test:e2e
+```
+
+Playwright can load unpacked extensions via persistent context:
+```js
+const context = await chromium.launchPersistentContext('', {
+  args: [
+    `--disable-extensions-except=${pathToExtension}`,
+    `--load-extension=${pathToExtension}`,
+  ],
+});
+```
+
+### Generating test fixtures with @pkmn/sim
+
+For deterministic unit tests, generate battle states programmatically:
+
+```js
+import { BattleStream } from '@pkmn/sim';
+
+const stream = new BattleStream();
+stream.write(`>start {"formatid":"gen9randombattle","seed":[1,2,3,4]}`);
+stream.write(`>player p1 {"name":"Alice"}`);
+stream.write(`>player p2 {"name":"Bob"}`);
+// Read protocol output, feed to snapshot extraction
+```
+
+Seeded RNG produces identical battles every time — perfect for regression tests.
 
 ## Architecture
 
@@ -93,7 +231,7 @@ positional = hazardDelta×0.12 + statusDelta×0.10 + speedControl×0.08
 | `@smogon/calc` | Damage calculation (16 rolls, KO chance) |
 | `@pkmn/data` | Pokemon/move/ability data |
 | `preact` | Lightweight UI for overlay |
-| `@crxjs/vite-plugin` | Chrome extension build tooling |
+| `vite` | Build tooling (multi-entry extension build) |
 
 ## Extensibility
 
@@ -103,11 +241,13 @@ positional = hazardDelta×0.12 + statusDelta×0.10 + speedControl×0.08
 
 ## Roadmap
 
-- [ ] Core: inject hook + state extraction + overlay shell
-- [ ] Eval engine: damage calc + scoring heuristic
-- [ ] Opponent model with Bayesian narrowing
-- [ ] Minimax search (depth 2, alpha-beta)
-- [ ] Full scoring: status moves, hazards, switch-in value, speed
+- [x] Core: inject hook + state extraction + overlay shell
+- [x] Eval engine: damage calc + scoring heuristic
+- [x] Opponent model with Bayesian narrowing
+- [x] Minimax search (depth 2, alpha-beta)
+- [x] Full scoring: status moves, hazards, switch-in value, speed
+- [ ] Replay fixture tests
+- [ ] Integration tests (Playwright + local PS)
 - [ ] ML evaluation function (ONNX Runtime Web)
 - [ ] Auto-play mode
 - [ ] Support additional formats (OU, UU, etc.)
