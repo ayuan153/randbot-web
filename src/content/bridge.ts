@@ -142,7 +142,7 @@ function trackSwitch(raw: string) {
 
 function injectHook() {
   const script = document.createElement('script');
-  script.src = chrome.runtime.getURL('src/inject/hook.ts');
+  script.src = chrome.runtime.getURL('inject/hook.js');
   script.type = 'module';
   (document.head || document.documentElement).appendChild(script);
   script.onload = () => script.remove();
