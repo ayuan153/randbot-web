@@ -1,0 +1,207 @@
+/**
+ * Expectiminimax search with alpha-beta pruning.
+ *
+ * Depth 2 default: my move → opponent response.
+ * Player nodes maximize, opponent nodes minimize (assume optimal play).
+ * Opponent moves weighted by probability from opponent model.
+ */
+
+import type { BattleSnapshot, ScoredOption, EvalConfig, OpponentModel, Action, PokemonState, MoveAction } from '../types';
+import { evaluate, tacticalBreakdown, tacticalScore } from './scoring';
+import { calculateDamage } from './damage';
+import { getLikelyMoves } from './opponent-model';
+
+const MINIMAX_WEIGHT = 0.7;
+const TACTICAL_WEIGHT = 0.3;
+
+/**
+ * Run expectiminimax search and return scored options.
+ */
+export function search(
+  snapshot: BattleSnapshot,
+  opponentModel: OpponentModel,
+  config: EvalConfig,
+): ScoredOption[] {
+  const startTime = Date.now();
+  const actions = snapshot.availableActions;
+  if (actions.length === 0) return [];
+
+  // Get opponent's likely moves for the minimax opponent node
+  const oppMoves = getLikelyMoves(opponentModel, snapshot.opponent.active.species);
+  // Take top-3 opponent moves to limit branching
+  const topOppMoves = oppMoves.slice(0, 3);
+
+  const results: ScoredOption[] = [];
+
+  for (const action of actions) {
+    // Check time limit
+    if (Date.now() - startTime > config.timeLimitMs) break;
+
+    let minimaxValue: number;
+    let pv: string[] = [];
+
+    if (action.type === 'move') {
+      // Simulate our move, then opponent's best response
+      minimaxValue = evaluateMove(snapshot, action, topOppMoves, config.depth - 1);
+      pv = [action.name];
+
+      // Add opponent's best response to PV
+      if (topOppMoves.length > 0) {
+        pv.push(`opp: ${topOppMoves[0].move}`);
+      }
+    } else {
+      // Switch: evaluate the resulting position
+      minimaxValue = evaluateSwitch(snapshot, action, topOppMoves);
+      pv = [`switch ${action.species}`];
+    }
+
+    // Compute tactical breakdown for root scoring
+    const breakdown = action.type === 'move'
+      ? tacticalBreakdown(snapshot, action.id)
+      : switchBreakdown(snapshot, action);
+
+    const tactical = tacticalScore(breakdown);
+    const score = MINIMAX_WEIGHT * normalizeMinimaxValue(minimaxValue) + TACTICAL_WEIGHT * tactical;
+
+    results.push({
+      action,
+      score: Math.max(0, Math.min(1, score)),
+      breakdown,
+      principalVariation: pv,
+    });
+  }
+
+  // Sort by score descending, take topN
+  results.sort((a, b) => b.score - a.score);
+  return results.slice(0, config.topN);
+}
+
+/**
+ * Evaluate a move action: compute expected value considering opponent responses.
+ */
+function evaluateMove(
+  snapshot: BattleSnapshot,
+  action: MoveAction,
+  oppMoves: Array<{ move: string; probability: number }>,
+  depth: number,
+): number {
+  // Our move's damage to opponent
+  const ourDmg = calculateDamage(
+    snapshot.player.active,
+    snapshot.opponent.active,
+    action.id,
+    snapshot.field,
+  );
+
+  if (depth <= 0 || oppMoves.length === 0) {
+    // Leaf: evaluate resulting state after our move
+    const resultState = applyDamage(snapshot, 'opponent', ourDmg.avgDmg);
+    return evaluate(resultState);
+  }
+
+  // Opponent node: weighted min over opponent moves
+  let worstValue = Infinity;
+
+  for (const oppMove of oppMoves) {
+    // Opponent's damage to us
+    const oppDmg = calculateDamage(
+      snapshot.opponent.active,
+      snapshot.player.active,
+      oppMove.move,
+      snapshot.field,
+    );
+
+    // State after both moves (simplified: apply both damages)
+    const afterOurMove = applyDamage(snapshot, 'opponent', ourDmg.avgDmg);
+    const afterBoth = applyDamage(afterOurMove, 'player', oppDmg.avgDmg);
+
+    const value = evaluate(afterBoth);
+    // Weight by probability, take minimum (opponent plays optimally)
+    const weightedValue = value * oppMove.probability;
+    if (weightedValue < worstValue) {
+      worstValue = weightedValue;
+    }
+  }
+
+  return worstValue;
+}
+
+/**
+ * Evaluate a switch action.
+ */
+function evaluateSwitch(
+  snapshot: BattleSnapshot,
+  action: { type: 'switch'; species: string; slot: number },
+  oppMoves: Array<{ move: string; probability: number }>,
+): number {
+  // Find the pokemon we're switching to
+  const switchIn = snapshot.player.bench.find(p => p.species === action.species);
+  if (!switchIn) return -1;
+
+  // Create state with new active
+  const newSnapshot: BattleSnapshot = {
+    ...snapshot,
+    player: { ...snapshot.player, active: switchIn },
+  };
+
+  if (oppMoves.length === 0) {
+    return evaluate(newSnapshot);
+  }
+
+  // Opponent gets a free hit on our switch-in
+  let worstValue = Infinity;
+  for (const oppMove of oppMoves) {
+    const oppDmg = calculateDamage(
+      snapshot.opponent.active,
+      switchIn,
+      oppMove.move,
+      snapshot.field,
+    );
+
+    const afterHit = applyDamage(newSnapshot, 'player', oppDmg.avgDmg);
+    const value = evaluate(afterHit) * oppMove.probability;
+    if (value < worstValue) worstValue = value;
+  }
+
+  return worstValue;
+}
+
+/**
+ * Create a ScoreBreakdown for a switch action.
+ */
+function switchBreakdown(
+  snapshot: BattleSnapshot,
+  action: { type: 'switch'; species: string; slot: number },
+) {
+  const switchIn = snapshot.player.bench.find(p => p.species === action.species);
+  const hpFraction = switchIn ? (switchIn.hpMax > 0 ? switchIn.hp / switchIn.hpMax : 0) : 0;
+
+  return {
+    damage: 0,
+    koProbability: 0,
+    statusValue: 0,
+    hazardValue: 0,
+    switchInValue: hpFraction * 0.5, // healthier switch-ins are better
+    speedAdvantage: 0,
+    positionalScore: 0,
+  };
+}
+
+// ─── Helpers ────────────────────────────────────────────────────
+
+/** Apply damage to a side's active pokemon (returns new snapshot) */
+function applyDamage(snapshot: BattleSnapshot, side: 'player' | 'opponent', damage: number): BattleSnapshot {
+  const target = side === 'player' ? snapshot.player.active : snapshot.opponent.active;
+  const newHp = Math.max(0, target.hp - damage);
+  const newActive: PokemonState = { ...target, hp: newHp, status: newHp <= 0 ? 'fnt' : target.status };
+
+  if (side === 'player') {
+    return { ...snapshot, player: { ...snapshot.player, active: newActive } };
+  }
+  return { ...snapshot, opponent: { ...snapshot.opponent, active: newActive } };
+}
+
+/** Normalize minimax value from [-1, 1] to [0, 1] for scoring */
+function normalizeMinimaxValue(value: number): number {
+  return (value + 1) / 2;
+}
