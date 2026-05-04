@@ -13,6 +13,7 @@ export default defineConfig({
         'content/bridge': resolve(__dirname, 'src/content/bridge.ts'),
         'worker/sw': resolve(__dirname, 'src/worker/sw.ts'),
         'eval/eval-worker': resolve(__dirname, 'src/eval/eval-worker.ts'),
+        'offscreen/eval-host': resolve(__dirname, 'offscreen/eval-host.ts'),
       },
       output: {
         entryFileNames: '[name].js',
@@ -21,6 +22,6 @@ export default defineConfig({
       },
     },
     target: 'esnext',
-    minify: false, // easier to debug
+    minify: false,
   },
 });

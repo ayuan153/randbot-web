@@ -3,7 +3,7 @@
   "name": "Randbats Bot",
   "version": "0.1.0",
   "description": "EV-based move suggestions for Pokémon Showdown Random Battles",
-  "permissions": ["storage"],
+  "permissions": ["storage", "offscreen"],
   "content_scripts": [
     {
       "matches": [
@@ -20,7 +20,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["src/inject/hook.ts"],
+      "resources": ["src/inject/hook.ts", "src/eval/eval-worker.ts"],
       "matches": ["*://play.pokemonshowdown.com/*", "*://*.psim.us/*"]
     }
   ]
