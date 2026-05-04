@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Randbats Bot",
+  "version": "0.1.0",
+  "description": "EV-based move suggestions for Pokémon Showdown Random Battles",
+  "permissions": ["storage"],
+  "content_scripts": [
+    {
+      "matches": [
+        "*://play.pokemonshowdown.com/*",
+        "*://*.psim.us/*"
+      ],
+      "js": ["src/content/bridge.ts"],
+      "run_at": "document_idle"
+    }
+  ],
+  "background": {
+    "service_worker": "src/worker/sw.ts",
+    "type": "module"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["src/inject/hook.ts"],
+      "matches": ["*://play.pokemonshowdown.com/*", "*://*.psim.us/*"]
+    }
+  ]
+}
