@@ -1,0 +1,211 @@
+|j|☆DerichlovesAEW
+|j|☆bautolomeoxd
+|t:|1777929730
+|gametype|singles
+|player|p1|DerichlovesAEW|170|1097
+|player|p2|bautolomeoxd|aaron|1091
+|gen|9
+|tier|[Gen 9] Random Battle
+|rated|
+|rule|Species Clause: Limit one of each Pokémon
+|rule|HP Percentage Mod: HP is shown in percentages
+|rule|Sleep Clause Mod: Limit one foe put to sleep
+|rule|Illusion Level Mod: Illusion disguises the Pokémon's true level
+|
+|t:|1777929730
+|teamsize|p1|6
+|teamsize|p2|6
+|start
+|switch|p1a: Lilligant|Lilligant-Hisui, L79, F|240/240
+|switch|p2a: Entei|Entei, L78|307/307
+|turn|1
+|
+|t:|1777929745
+|switch|p1a: Rhyperior|Rhyperior, L82, F|323/323
+|move|p2a: Entei|Extreme Speed|p1a: Rhyperior
+|-resisted|p1a: Rhyperior
+|-damage|p1a: Rhyperior|289/323
+|
+|upkeep
+|turn|2
+|
+|t:|1777929758
+|switch|p2a: Qwilfish|Qwilfish-Hisui, L83, M|244/244
+|-ability|p2a: Qwilfish|Intimidate|boost
+|-unboost|p1a: Rhyperior|atk|1
+|move|p1a: Rhyperior|Stone Edge|p2a: Qwilfish|[miss]
+|-miss|p1a: Rhyperior|p2a: Qwilfish
+|
+|upkeep
+|turn|3
+|
+|t:|1777929782
+|move|p2a: Qwilfish|Spikes|p1a: Rhyperior
+|-sidestart|p1: DerichlovesAEW|Spikes
+|move|p1a: Rhyperior|Stone Edge|p2a: Qwilfish
+|-damage|p2a: Qwilfish|147/244
+|
+|upkeep
+|turn|4
+|
+|t:|1777929789
+|move|p2a: Qwilfish|Crunch|p1a: Rhyperior
+|-damage|p1a: Rhyperior|229/323
+|move|p1a: Rhyperior|Stone Edge|p2a: Qwilfish|[miss]
+|-miss|p1a: Rhyperior|p2a: Qwilfish
+|
+|upkeep
+|turn|5
+|
+|t:|1777929794
+|move|p2a: Qwilfish|Spikes|p1a: Rhyperior
+|-sidestart|p1: DerichlovesAEW|Spikes
+|move|p1a: Rhyperior|Stone Edge|p2a: Qwilfish
+|-damage|p2a: Qwilfish|48/244
+|
+|upkeep
+|turn|6
+|
+|t:|1777929799
+|move|p2a: Qwilfish|Spikes|p1a: Rhyperior
+|-sidestart|p1: DerichlovesAEW|Spikes
+|move|p1a: Rhyperior|Stone Edge|p2a: Qwilfish
+|-crit|p2a: Qwilfish
+|-damage|p2a: Qwilfish|0 fnt
+|faint|p2a: Qwilfish
+|
+|upkeep
+|
+|t:|1777929803
+|switch|p2a: Inteleon|Inteleon, L81, F|246/246
+|turn|7
+|
+|t:|1777929811
+|switch|p1a: Lilligant|Lilligant-Hisui, L79, F|240/240
+|-damage|p1a: Lilligant|180/240|[from] Spikes
+|move|p2a: Inteleon|Hydro Pump|p1a: Lilligant
+|-resisted|p1a: Lilligant
+|-damage|p1a: Lilligant|69/240
+|
+|upkeep
+|turn|8
+|
+|t:|1777929822
+|-terastallize|p1a: Lilligant|Fighting
+|move|p2a: Inteleon|Hydro Pump|p1a: Lilligant
+|-damage|p1a: Lilligant|0 fnt
+|faint|p1a: Lilligant
+|
+|upkeep
+|
+|t:|1777929834
+|switch|p1a: Kingdra|Kingdra, L84, M|263/263
+|-damage|p1a: Kingdra|198/263|[from] Spikes
+|turn|9
+|
+|t:|1777929842
+|switch|p2a: Volbeat|Volbeat, L90, M|263/263
+|move|p1a: Kingdra|Hurricane|p2a: Volbeat
+|-supereffective|p2a: Volbeat
+|-damage|p2a: Volbeat|55/263
+|-damage|p1a: Kingdra|172/263|[from] item: Life Orb
+|
+|upkeep
+|turn|10
+|
+|t:|1777929853
+|move|p2a: Volbeat|Thunder Wave|p1a: Kingdra
+|-status|p1a: Kingdra|par
+|move|p1a: Kingdra|Hurricane|p2a: Volbeat
+|-supereffective|p2a: Volbeat
+|-damage|p2a: Volbeat|0 fnt
+|faint|p2a: Volbeat
+|-damage|p1a: Kingdra|146/263 par|[from] item: Life Orb
+|
+|upkeep
+|
+|t:|1777929859
+|switch|p2a: Inteleon|Inteleon, L81, F|246/246
+|turn|11
+|
+|t:|1777929863
+|move|p2a: Inteleon|Ice Beam|p1a: Kingdra
+|-damage|p1a: Kingdra|50/263 par
+|move|p1a: Kingdra|Hurricane|p2a: Inteleon|[miss]
+|-miss|p1a: Kingdra|p2a: Inteleon
+|
+|upkeep
+|turn|12
+|
+|t:|1777929876
+|switch|p1a: Scyther|Scyther, L82, F|249/249
+|move|p2a: Inteleon|Ice Beam|p1a: Scyther
+|-supereffective|p1a: Scyther
+|-damage|p1a: Scyther|0 fnt
+|faint|p1a: Scyther
+|
+|upkeep
+|
+|t:|1777929885
+|switch|p1a: Mewtwo|Mewtwo, L72|272/272
+|-ability|p1a: Mewtwo|Unnerve
+|-damage|p1a: Mewtwo|204/272|[from] Spikes
+|turn|13
+|
+|t:|1777929895
+|switch|p2a: Jolteon|Jolteon, L84, F|246/246
+|move|p1a: Mewtwo|Psystrike|p2a: Jolteon
+|-damage|p2a: Jolteon|51/246
+|-damage|p1a: Mewtwo|177/272|[from] item: Life Orb
+|
+|upkeep
+|turn|14
+|
+|t:|1777929905
+|move|p2a: Jolteon|Shadow Ball|p1a: Mewtwo
+|-supereffective|p1a: Mewtwo
+|-damage|p1a: Mewtwo|0 fnt
+|faint|p1a: Mewtwo
+|
+|upkeep
+|
+|t:|1777929911
+|switch|p1a: Rhyperior|Rhyperior, L82, F|229/323
+|-damage|p1a: Rhyperior|149/323|[from] Spikes
+|turn|15
+|
+|t:|1777929921
+|move|p2a: Jolteon|Shadow Ball|p1a: Rhyperior
+|-damage|p1a: Rhyperior|26/323
+|move|p1a: Rhyperior|Earthquake|p2a: Jolteon
+|-supereffective|p2a: Jolteon
+|-damage|p2a: Jolteon|0 fnt
+|faint|p2a: Jolteon
+|
+|upkeep
+|
+|t:|1777929925
+|switch|p2a: Inteleon|Inteleon, L81, F|246/246
+|turn|16
+|
+|t:|1777929930
+|switch|p1a: Pyroar|Pyroar, L88, F|295/295
+|-ability|p1a: Pyroar|Unnerve
+|move|p2a: Inteleon|Scald|p1a: Pyroar
+|-supereffective|p1a: Pyroar
+|-damage|p1a: Pyroar|0 fnt
+|faint|p1a: Pyroar
+|
+|upkeep
+|
+|t:|1777929939
+|switch|p1a: Kingdra|Kingdra, L84, M|50/263 par
+|-damage|p1a: Kingdra|0 fnt|[from] Spikes
+|faint|p1a: Kingdra
+|-message|DerichlovesAEW forfeited.
+|
+|win|bautolomeoxd
+|raw|DerichlovesAEW's rating: 1097 &rarr; <strong>1072</strong><br />(-25 for losing)
+|raw|bautolomeoxd's rating: 1091 &rarr; <strong>1118</strong><br />(+27 for winning)
+|l|☆DerichlovesAEW
+|player|p1|
