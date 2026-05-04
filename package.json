@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite build --watch",
+    "dev:launch": "bash scripts/dev-launch.sh",
     "build": "vite build && node scripts/post-build.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
