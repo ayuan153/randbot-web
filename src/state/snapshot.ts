@@ -204,6 +204,16 @@ export function extractSnapshot(
     };
   }
 
+  // Enrich active ability/item from request (request is source of truth for player's own mons)
+  if (activeReqMon) {
+    if (!myActive.ability) {
+      myActive.ability = activeReqMon.ability || activeReqMon.baseAbility || null;
+    }
+    if (!myActive.item) {
+      myActive.item = activeReqMon.item || null;
+    }
+  }
+
   // Enrich active moves from request
   if (request.active?.[0]?.moves) {
     myActive.moves = request.active[0].moves.map(m => m.move || m.id);
