@@ -117,9 +117,15 @@ export function tacticalBreakdown(
 
   const dmgResult = calculateDamage(attacker, defender, moveName, snapshot.field, undefined, defenderOverrides);
   const dmgPct = damagePercent(dmgResult, defender.hpMax);
+  const realHP = dmgResult.realMaxHP > 0 ? dmgResult.realMaxHP : defender.hpMax;
 
   return {
     damage: dmgPct,
+    damageRange: realHP > 0 ? {
+      min: dmgResult.minDmg / realHP,
+      max: dmgResult.maxDmg / realHP,
+      avg: dmgResult.avgDmg / realHP,
+    } : undefined,
     koProbability: dmgResult.koChance,
     statusValue: isStatusMove(moveName) ? 0.5 : 0,
     hazardValue: isHazardMove(moveName) ? hazardMoveValue(snapshot) : 0,
