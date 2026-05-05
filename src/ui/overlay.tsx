@@ -21,7 +21,7 @@ interface OverlayProps {
 
 function Overlay({ options, turn, elapsedMs, snapshot, opponentModel, onDownload }: OverlayProps) {
   const [collapsed, setCollapsed] = useState(false);
-  const [devMode, setDevMode] = useState(false);
+  const [devMode, setDevMode] = useState(true);
 
   return (
     <div class="randbats-overlay">
