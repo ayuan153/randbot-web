@@ -81,7 +81,8 @@ function trackProtocol(roomId: string, raw: string) {
 }
 
 function trackProtocolInner(roomId: string, raw: string) {
-  const oppPrefix = roomOpponentPrefix.get(roomId) || 'p2';
+  const oppPrefix = roomOpponentPrefix.get(roomId);
+  if (!oppPrefix) return; // Can't track until we know which side is ours
   const lines = raw.split('\n');
   for (const line of lines) {
     const parts = line.split('|');
@@ -164,14 +165,16 @@ function extractSpeciesFromIdent(ident: string, roomId: string): string | null {
   // We rely on the identToSpecies map populated by switch events
   if (identToSpecies.has(ident)) return identToSpecies.get(ident)!;
   // Fallback: extract from ident using the dynamic opponent prefix
-  const oppPrefix = roomOpponentPrefix.get(roomId) || 'p2';
+  const oppPrefix = roomOpponentPrefix.get(roomId);
+  if (!oppPrefix) return null;
   const match = ident.match(new RegExp(`${oppPrefix}[a-z]: (.+)`));
   return match?.[1] || null;
 }
 
 /** Track species from switch events for ident resolution */
 function trackSwitch(raw: string, roomId: string) {
-  const oppPrefix = roomOpponentPrefix.get(roomId) || 'p2';
+  const oppPrefix = roomOpponentPrefix.get(roomId);
+  if (!oppPrefix) return; // Can't track until we know which side is ours
   const lines = raw.split('\n');
   for (const line of lines) {
     const parts = line.split('|');
@@ -261,7 +264,7 @@ function listenForHookMessages(updateOverlay: ReturnType<typeof mountOverlay>) {
       acc.push(...msg.raw.split('\n').filter((l: string) => l.length > 0));
       protocolAccumulator.set(msg.roomId, acc);
 
-      // Detect which side we are from |request| JSON (contains side.id)
+      // Parse |request| FIRST to determine which side we are before processing other lines
       if (!roomOpponentPrefix.has(msg.roomId)) {
         const reqLine = msg.raw.split('\n').find((l: string) => l.startsWith('|request|'));
         if (reqLine) {
@@ -273,6 +276,8 @@ function listenForHookMessages(updateOverlay: ReturnType<typeof mountOverlay>) {
           } catch { /* ignore parse errors */ }
         }
       }
+      // Only process protocol if we know which side is the opponent
+      // trackSwitch and trackProtocol will early-return if prefix is unknown
       trackSwitch(msg.raw, msg.roomId);
       trackProtocol(msg.roomId, msg.raw);
     }
@@ -283,7 +288,8 @@ function listenForHookMessages(updateOverlay: ReturnType<typeof mountOverlay>) {
       const model = getModel(roomId);
 
       // Bug 3 fix: if opponent active is 'unknown', fill from model's most recent reveal
-      if (snapshot.opponent.active.species === 'unknown' && model.pokemon.length > 0) {
+      // Only fill if we know which side is the opponent (prefix is set)
+      if (snapshot.opponent.active.species === 'unknown' && model.pokemon.length > 0 && roomOpponentPrefix.has(roomId)) {
         // The last revealed pokemon in the model is the current active (from trackProtocol processing |switch|)
         const lastRevealed = model.pokemon[model.pokemon.length - 1];
         if (lastRevealed) {
