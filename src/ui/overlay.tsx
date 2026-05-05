@@ -6,23 +6,50 @@
 
 import { h, render } from 'preact';
 import { useState } from 'preact/hooks';
-import type { ScoredOption } from '../types';
+import type { BattleSnapshot, OpponentModel, ScoredOption } from '../types';
 import { SuggestionCard } from './suggestion-card';
+import { DevPanel } from './dev-panel';
 
 interface OverlayProps {
   options: ScoredOption[];
   turn: number;
   elapsedMs: number;
+  snapshot: BattleSnapshot | null;
+  opponentModel: OpponentModel | null;
+  onDownload: () => void;
 }
 
-function Overlay({ options, turn, elapsedMs }: OverlayProps) {
+function Overlay({ options, turn, elapsedMs, snapshot, opponentModel, onDownload }: OverlayProps) {
   const [collapsed, setCollapsed] = useState(false);
+  const [devMode, setDevMode] = useState(false);
 
   return (
     <div class="randbats-overlay">
       <div class="overlay-header" onClick={() => setCollapsed(!collapsed)}>
         <span class="overlay-title">⚔️ randbats-bot</span>
         <span class="overlay-meta">Turn {turn} • {elapsedMs}ms</span>
+        <button
+          class="overlay-download"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDownload();
+          }}
+          title="Download battle log"
+          aria-label="Download battle log"
+        >
+          📥
+        </button>
+        <button
+          class={`dev-toggle ${devMode ? 'dev-toggle-active' : ''}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            setDevMode(!devMode);
+          }}
+          aria-label="Toggle dev mode"
+          aria-pressed={devMode}
+        >
+          DEV
+        </button>
         <span class="overlay-toggle">{collapsed ? '▶' : '▼'}</span>
       </div>
       {!collapsed && (
@@ -31,6 +58,9 @@ function Overlay({ options, turn, elapsedMs }: OverlayProps) {
           {options.map((opt, i) => (
             <SuggestionCard key={i} option={opt} rank={i + 1} />
           ))}
+          {devMode && (
+            <DevPanel snapshot={snapshot} options={options} opponentModel={opponentModel} />
+          )}
         </div>
       )}
     </div>
@@ -41,7 +71,13 @@ function Overlay({ options, turn, elapsedMs }: OverlayProps) {
  * Mount the overlay into a Shadow DOM container on the page.
  * Returns an update function to re-render with new data.
  */
-export function mountOverlay(): (options: ScoredOption[], turn: number, elapsedMs: number) => void {
+export function mountOverlay(onDownload: () => void): (
+  options: ScoredOption[],
+  turn: number,
+  elapsedMs: number,
+  snapshot?: BattleSnapshot | null,
+  opponentModel?: OpponentModel | null,
+) => void {
   // Create host element
   const host = document.createElement('div');
   host.id = 'randbats-bot-overlay';
@@ -60,8 +96,14 @@ export function mountOverlay(): (options: ScoredOption[], turn: number, elapsedM
   shadow.appendChild(mountPoint);
 
   // Return updater function
-  return (options: ScoredOption[], turn: number, elapsedMs: number) => {
-    render(h(Overlay, { options, turn, elapsedMs }), mountPoint);
+  return (
+    options: ScoredOption[],
+    turn: number,
+    elapsedMs: number,
+    snapshot: BattleSnapshot | null = null,
+    opponentModel: OpponentModel | null = null,
+  ) => {
+    render(h(Overlay, { options, turn, elapsedMs, snapshot, opponentModel, onDownload }), mountPoint);
   };
 }
 
@@ -102,6 +144,19 @@ function getStyles(): string {
     .overlay-toggle {
       font-size: 10px;
       color: #888;
+    }
+    .overlay-download {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      padding: 0 4px;
+      line-height: 1;
+      opacity: 0.7;
+      transition: opacity 0.2s;
+    }
+    .overlay-download:hover {
+      opacity: 1;
     }
     .overlay-body {
       padding: 8px;
@@ -157,6 +212,74 @@ function getStyles(): string {
       font-size: 11px;
       color: #aaa;
       margin-top: 3px;
+    }
+    .dev-toggle {
+      font-size: 9px;
+      font-weight: 700;
+      padding: 2px 5px;
+      margin-right: 6px;
+      border: 1px solid #444;
+      border-radius: 3px;
+      background: transparent;
+      color: #666;
+      cursor: pointer;
+      line-height: 1;
+    }
+    .dev-toggle:hover {
+      color: #aaa;
+      border-color: #666;
+    }
+    .dev-toggle-active {
+      color: #4caf50;
+      border-color: #4caf50;
+      background: rgba(76, 175, 80, 0.1);
+    }
+    .dev-panel {
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid #333;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      font-size: 10px;
+      line-height: 1.4;
+    }
+    .dev-section {
+      margin-bottom: 6px;
+      padding: 4px 6px;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 3px;
+    }
+    .dev-section:last-child {
+      margin-bottom: 0;
+    }
+    .dev-section-title {
+      font-weight: 700;
+      color: #7faaff;
+      margin-bottom: 2px;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .dev-row {
+      color: #ccc;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .dev-label {
+      color: #888;
+    }
+    .dev-indent {
+      padding-left: 8px;
+    }
+    .dev-opponent-mon {
+      margin-bottom: 3px;
+      padding-bottom: 3px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .dev-opponent-mon:last-child {
+      margin-bottom: 0;
+      padding-bottom: 0;
+      border-bottom: none;
     }
   `;
 }
