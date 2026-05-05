@@ -311,6 +311,9 @@
     const app = (window as any).app;
     const origReceive = app.receive.bind(app);
 
+    // Accumulate protocol lines per room so we can search across messages
+    const roomProtocolLines: Record<string, string[]> = {};
+
     app.receive = function (data: string) {
       // Call original first so PS updates its state
       origReceive(data);
@@ -321,6 +324,13 @@
       const newline = data.indexOf('\n');
       const roomId = data.slice(1, newline > 0 ? newline : undefined);
       const lines = data.slice(newline + 1).split('\n');
+
+      // Accumulate lines for this room (reset on |turn| to avoid unbounded growth)
+      if (!roomProtocolLines[roomId]) roomProtocolLines[roomId] = [];
+      for (const l of lines) {
+        if (l.startsWith('|turn|')) roomProtocolLines[roomId] = [];
+        roomProtocolLines[roomId].push(l);
+      }
 
       // Track boosts from ALL protocol messages (cumulative, resets on switch)
       updateTrackedBoosts(lines);
@@ -349,7 +359,7 @@
             if (snapshot.opponent.active.species === 'unknown' || snapshot.opponent.active.hp === 0) {
               const request = app.rooms[roomId]?.request;
               const mySideId = request?.side?.id || 'p1';
-              const parsed = parseOppActiveFromProtocol(lines, mySideId);
+              const parsed = parseOppActiveFromProtocol(roomProtocolLines[roomId] || lines, mySideId);
               if (parsed) {
                 snapshot.opponent.active.species = parsed.species;
                 snapshot.opponent.active.level = parsed.level;
