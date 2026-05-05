@@ -27,6 +27,7 @@ export interface TurnLog {
   recommendations: ScoredOption[];
   actualOutcome?: TurnOutcome;
   opponentModelState?: OpponentModelSnapshot[];
+  protocol?: string[];
 }
 
 export interface BattleLog {
@@ -48,7 +49,7 @@ export class TurnLogger {
     };
   }
 
-  logTurn(turn: number, snapshot: BattleSnapshot, recommendations: ScoredOption[], opponentModelState?: OpponentModelSnapshot[]): void {
+  logTurn(turn: number, snapshot: BattleSnapshot, recommendations: ScoredOption[], opponentModelState?: OpponentModelSnapshot[], protocol?: string[]): void {
     if (!this.log) return;
     // Replace existing entry for same turn (in case of re-eval)
     const idx = this.log.turns.findIndex((t) => t.turn === turn);
@@ -58,6 +59,7 @@ export class TurnLogger {
       snapshot,
       recommendations,
       opponentModelState,
+      protocol,
     };
     if (idx >= 0) {
       entry.actualOutcome = this.log.turns[idx].actualOutcome;

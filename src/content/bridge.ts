@@ -11,7 +11,7 @@ import {
   revealItem,
   revealAbility,
 } from '../eval/opponent-model';
-import { loadSetsDb } from '../state/sets-db';
+import { loadSetsDb, isLoaded } from '../state/sets-db';
 import { mountOverlay } from '../ui/overlay';
 import { TurnLogger, OpponentModelSnapshot } from '../logging/turn-logger';
 
@@ -35,6 +35,16 @@ const turnLogger = new TurnLogger();
 
 /** Previous snapshot for outcome tracking */
 let prevSnapshot: BattleSnapshot | null = null;
+
+/** Promise that resolves when the sets DB is loaded */
+let dbReadyResolve: () => void;
+const dbReady = new Promise<void>((resolve) => { dbReadyResolve = resolve; });
+
+/** Buffered protocol messages received before DB was ready */
+const protocolBuffer: Array<{ roomId: string; raw: string }> = [];
+
+/** Protocol lines accumulated since last turn, keyed by roomId */
+const protocolAccumulator = new Map<string, string[]>();
 
 function getModel(roomId: string): OpponentModel {
   if (!roomModels.has(roomId)) {
@@ -60,8 +70,17 @@ function getOpponentModelSnapshot(model: OpponentModel): OpponentModelSnapshot[]
 /**
  * Parse raw protocol lines to track opponent reveals.
  * Protocol format: |type|args...
+ * If DB isn't loaded yet, buffers lines for replay.
  */
 function trackProtocol(roomId: string, raw: string) {
+  if (!isLoaded()) {
+    protocolBuffer.push({ roomId, raw });
+    return;
+  }
+  trackProtocolInner(roomId, raw);
+}
+
+function trackProtocolInner(roomId: string, raw: string) {
   const oppPrefix = roomOpponentPrefix.get(roomId) || 'p2';
   const lines = raw.split('\n');
   for (const line of lines) {
@@ -140,12 +159,13 @@ function trackProtocol(roomId: string, raw: string) {
 /** Map of ident (e.g. "p2a: Garchomp") to species name, tracked from switch messages */
 const identToSpecies = new Map<string, string>();
 
-function extractSpeciesFromIdent(ident: string, _roomId: string): string | null {
+function extractSpeciesFromIdent(ident: string, roomId: string): string | null {
   // Ident format: "p2a: Nickname" — the nickname may differ from species
   // We rely on the identToSpecies map populated by switch events
   if (identToSpecies.has(ident)) return identToSpecies.get(ident)!;
-  // Fallback: extract from ident (works when nickname = species)
-  const match = ident.match(/p2[a-z]: (.+)/);
+  // Fallback: extract from ident using the dynamic opponent prefix
+  const oppPrefix = roomOpponentPrefix.get(roomId) || 'p2';
+  const match = ident.match(new RegExp(`${oppPrefix}[a-z]: (.+)`));
   return match?.[1] || null;
 }
 
@@ -218,10 +238,13 @@ function handleResult(result: EvalResult, updateOverlay: ReturnType<typeof mount
   const snapshot = prevSnapshot ?? null;
   const model = snapshot ? getModel(snapshot.roomId) : null;
   updateOverlay(result.options, result.turn, result.elapsedMs, snapshot, model);
-  // Log turn with the snapshot we stored, including opponent model state
+  // Log turn with the snapshot we stored, including opponent model state and protocol
   if (prevSnapshot && prevSnapshot.turn === result.turn) {
     const modelState = model ? getOpponentModelSnapshot(model) : undefined;
-    turnLogger.logTurn(result.turn, prevSnapshot, result.options, modelState);
+    const protocol = protocolAccumulator.get(prevSnapshot.roomId);
+    turnLogger.logTurn(result.turn, prevSnapshot, result.options, modelState, protocol);
+    // Flush protocol accumulator for this room after logging
+    protocolAccumulator.set(prevSnapshot.roomId, []);
   }
 }
 
@@ -233,6 +256,11 @@ function listenForHookMessages(updateOverlay: ReturnType<typeof mountOverlay>) {
     const msg = event.data;
 
     if (msg.type === 'PS_PROTOCOL_MSG') {
+      // Accumulate protocol lines for turn logging
+      const acc = protocolAccumulator.get(msg.roomId) || [];
+      acc.push(...msg.raw.split('\n').filter((l: string) => l.length > 0));
+      protocolAccumulator.set(msg.roomId, acc);
+
       // Detect which side we are from |request| JSON (contains side.id)
       if (!roomOpponentPrefix.has(msg.roomId)) {
         const reqLine = msg.raw.split('\n').find((l: string) => l.startsWith('|request|'));
@@ -295,6 +323,12 @@ injectHook();
 const setsUrl = chrome.runtime.getURL('data/gen9randombattle.json');
 loadSetsDb(setsUrl).then(() => {
   console.log('[randbats-bot] Sets DB loaded');
+  // Replay buffered protocol lines that arrived before DB was ready
+  for (const { roomId, raw } of protocolBuffer) {
+    trackProtocolInner(roomId, raw);
+  }
+  protocolBuffer.length = 0;
+  dbReadyResolve();
 }).catch((err) => {
   console.error('[randbats-bot] Failed to load sets DB:', err);
 });
