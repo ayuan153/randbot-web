@@ -41,6 +41,37 @@
     return { species, level };
   }
 
+  /** Parse opponent active from protocol lines (fallback when battle object lags) */
+  function parseOppActiveFromProtocol(lines: string[], mySideId: string): { species: string; level: number; hp: number; hpMax: number; ability: string | null } | null {
+    const oppPrefix = mySideId === 'p1' ? 'p2a' : 'p1a';
+    let species = '';
+    let level = 100;
+    let hp = 0;
+    let hpMax = 0;
+    let ability: string | null = null;
+
+    for (const line of lines) {
+      const parts = line.split('|');
+      if (parts.length < 4) continue;
+      const type = parts[1];
+      // Match switch/drag for opponent active slot
+      if ((type === 'switch' || type === 'drag') && parts[2]?.startsWith(oppPrefix + ':')) {
+        const parsed = parseDetails(parts[3]);
+        species = parsed.species;
+        level = parsed.level;
+        if (parts[4]) {
+          const cond = parseCondition(parts[4]);
+          hp = cond.hp;
+          hpMax = cond.hpMax;
+        }
+      } else if (type === '-ability' && parts[2]?.startsWith(oppPrefix + ':')) {
+        ability = parts[3]?.trim() || null;
+      }
+    }
+
+    return species ? { species, level, hp, hpMax, ability } : null;
+  }
+
   /** Extract side field conditions (hazards, screens) */
   function extractSideField(sideConditions: Record<string, any>) {
     return {
@@ -304,15 +335,29 @@
       // Parse boost changes from protocol (battle object may lag due to animation queue)
       const boostOverrides = parseBoostsFromProtocol(lines);
 
-      // Poll until battle.mySide.active[0] is populated (or timeout)
+      // Poll until both mySide AND farSide active are populated (or timeout)
       const pollStart = Date.now();
       const pollForActive = () => {
         const battle = app.rooms[roomId]?.battle;
-        if (battle?.mySide?.active[0]?.speciesForme || Date.now() - pollStart > 500) {
+        const bothReady = battle?.mySide?.active[0]?.speciesForme && battle?.farSide?.active[0]?.speciesForme;
+        if (bothReady || Date.now() - pollStart > 500) {
           const snapshot = extractSnapshot(roomId);
           if (snapshot && snapshot.availableActions.length > 0) {
             // Apply boost overrides from protocol parsing
             applyBoostOverrides(snapshot, boostOverrides, battle);
+            // Fallback: parse opponent from protocol if battle object hasn't populated farSide
+            if (snapshot.opponent.active.species === 'unknown' || snapshot.opponent.active.hp === 0) {
+              const request = app.rooms[roomId]?.request;
+              const mySideId = request?.side?.id || 'p1';
+              const parsed = parseOppActiveFromProtocol(lines, mySideId);
+              if (parsed) {
+                snapshot.opponent.active.species = parsed.species;
+                snapshot.opponent.active.level = parsed.level;
+                snapshot.opponent.active.hp = parsed.hp;
+                snapshot.opponent.active.hpMax = parsed.hpMax;
+                if (parsed.ability) snapshot.opponent.active.ability = parsed.ability;
+              }
+            }
             window.postMessage({ source: SOURCE, type: 'PS_TURN_REQUEST', snapshot }, '*');
           }
         } else {
