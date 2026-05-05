@@ -115,22 +115,32 @@ export function calculateDamage(
       defenderActualCurHP = defender.hp;
     }
 
-    const move = new Move(gen, moveName);
+    const abilityName = (attackerOverrides?.ability || attacker.ability || undefined) as import('@smogon/calc/dist/data/interface').AbilityName | undefined;
+    const move = new Move(gen, moveName, { ability: abilityName });
     const calcField = buildField(field, true);
 
     const result = calculate(gen, atkMon, defMon, move, calcField);
 
-    // result.damage is either a number or number[] (16 rolls)
-    const rolls: number[] = Array.isArray(result.damage)
-      ? (result.damage as number[])
-      : [result.damage as number];
+    // result.damage is either a number, number[] (16 rolls), or number[][] (multi-hit: per-hit rolls)
+    let rolls: number[];
+    if (Array.isArray(result.damage) && Array.isArray(result.damage[0])) {
+      // Multi-hit move: result.damage is number[][] — use first hit's rolls
+      rolls = (result.damage as number[][])[0];
+    } else if (Array.isArray(result.damage)) {
+      rolls = result.damage as number[];
+    } else {
+      rolls = [result.damage as number];
+    }
 
-    const minDmg = Math.min(...rolls);
-    const maxDmg = Math.max(...rolls);
-    const avgDmg = rolls.reduce((a, b) => a + b, 0) / rolls.length;
+    // For multi-hit moves, multiply per-hit damage by number of hits
+    const hitMultiplier = move.hits;
 
-    // Fix Bug 3: Compare rolls against actual current HP, not percentage
-    const koRolls = rolls.filter(d => d >= defenderActualCurHP).length;
+    const minDmg = Math.min(...rolls) * hitMultiplier;
+    const maxDmg = Math.max(...rolls) * hitMultiplier;
+    const avgDmg = (rolls.reduce((a, b) => a + b, 0) / rolls.length) * hitMultiplier;
+
+    // Fix Bug 3: Compare total damage (per-hit × hits) against actual current HP
+    const koRolls = rolls.filter(d => d * hitMultiplier >= defenderActualCurHP).length;
     const koChance = rolls.length > 0 ? koRolls / rolls.length : 0;
 
     return { move: moveName, minDmg, maxDmg, avgDmg, koChance, rolls, realMaxHP };
