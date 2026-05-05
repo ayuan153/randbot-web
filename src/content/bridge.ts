@@ -11,6 +11,7 @@ import {
   revealItem,
   revealAbility,
 } from '../eval/opponent-model';
+import { loadSetsDb } from '../state/sets-db';
 import { mountOverlay } from '../ui/overlay';
 import { TurnLogger, OpponentModelSnapshot } from '../logging/turn-logger';
 
@@ -25,6 +26,9 @@ const DEFAULT_CONFIG = {
 
 /** Per-room opponent model state */
 const roomModels = new Map<string, OpponentModel>();
+
+/** Per-room opponent side prefix (e.g., 'p2' if we are p1) */
+const roomOpponentPrefix = new Map<string, string>();
 
 /** Turn logger instance */
 const turnLogger = new TurnLogger();
@@ -58,6 +62,7 @@ function getOpponentModelSnapshot(model: OpponentModel): OpponentModelSnapshot[]
  * Protocol format: |type|args...
  */
 function trackProtocol(roomId: string, raw: string) {
+  const oppPrefix = roomOpponentPrefix.get(roomId) || 'p2';
   const lines = raw.split('\n');
   for (const line of lines) {
     const parts = line.split('|');
@@ -65,9 +70,9 @@ function trackProtocol(roomId: string, raw: string) {
 
     const type = parts[1];
     // Pokemon ident format: "p1a: Nickname" or "p2a: Nickname"
-    // We track p2 (opponent) reveals
+    // We track opponent reveals
     const ident = parts[2] || '';
-    const isOpponent = ident.startsWith('p2');
+    const isOpponent = ident.startsWith(oppPrefix);
 
     if (!isOpponent) continue;
 
@@ -120,7 +125,7 @@ function trackProtocol(roomId: string, raw: string) {
       }
       case 'teamsize': {
         // |teamsize|p2|6
-        if (parts[2] === 'p2') {
+        if (parts[2] === oppPrefix) {
           const size = parseInt(parts[3] || '6', 10);
           const model = getModel(roomId);
           model.unrevealed = size;
@@ -145,14 +150,15 @@ function extractSpeciesFromIdent(ident: string, _roomId: string): string | null 
 }
 
 /** Track species from switch events for ident resolution */
-function trackSwitch(raw: string) {
+function trackSwitch(raw: string, roomId: string) {
+  const oppPrefix = roomOpponentPrefix.get(roomId) || 'p2';
   const lines = raw.split('\n');
   for (const line of lines) {
     const parts = line.split('|');
     if (parts.length < 4) continue;
     if (parts[1] !== 'switch' && parts[1] !== 'drag') continue;
     const ident = parts[2] || '';
-    if (!ident.startsWith('p2')) continue;
+    if (!ident.startsWith(oppPrefix)) continue;
     const details = parts[3] || '';
     const species = details.split(',')[0];
     if (species) identToSpecies.set(ident, species);
@@ -227,7 +233,19 @@ function listenForHookMessages(updateOverlay: ReturnType<typeof mountOverlay>) {
     const msg = event.data;
 
     if (msg.type === 'PS_PROTOCOL_MSG') {
-      trackSwitch(msg.raw);
+      // Detect which side we are from |request| JSON (contains side.id)
+      if (!roomOpponentPrefix.has(msg.roomId)) {
+        const reqLine = msg.raw.split('\n').find((l: string) => l.startsWith('|request|'));
+        if (reqLine) {
+          try {
+            const reqJson = JSON.parse(reqLine.slice('|request|'.length));
+            const mySideId = reqJson.side?.id;
+            if (mySideId === 'p1') roomOpponentPrefix.set(msg.roomId, 'p2');
+            else if (mySideId === 'p2') roomOpponentPrefix.set(msg.roomId, 'p1');
+          } catch { /* ignore parse errors */ }
+        }
+      }
+      trackSwitch(msg.raw, msg.roomId);
       trackProtocol(msg.roomId, msg.raw);
     }
 
@@ -274,6 +292,12 @@ function listenForSwMessages(updateOverlay: ReturnType<typeof mountOverlay>) {
 }
 
 injectHook();
+const setsUrl = chrome.runtime.getURL('data/gen9randombattle.json');
+loadSetsDb(setsUrl).then(() => {
+  console.log('[randbats-bot] Sets DB loaded');
+}).catch((err) => {
+  console.error('[randbats-bot] Failed to load sets DB:', err);
+});
 const updateOverlay = mountOverlay(downloadLog);
 listenForHookMessages(updateOverlay);
 listenForSwMessages(updateOverlay);

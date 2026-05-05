@@ -18,6 +18,7 @@ manifest.background.service_worker = 'worker/sw.js';
 manifest.web_accessible_resources[0].resources = [
   'inject/hook.js',
   'eval/eval-worker.js',
+  'data/gen9randombattle.json',
 ];
 
 // Write manifest to dist

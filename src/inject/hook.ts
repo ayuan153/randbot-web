@@ -193,6 +193,89 @@
     };
   }
 
+  /** Parse boost/unboost lines from protocol to get current boost state */
+  interface BoostChange {
+    ident: string;
+    stat: string;
+    amount: number;
+    absolute: boolean;
+  }
+
+  function parseBoostsFromProtocol(lines: string[]): BoostChange[] {
+    const changes: BoostChange[] = [];
+    for (const line of lines) {
+      const parts = line.split('|');
+      if (parts.length < 4) continue;
+      const type = parts[1];
+      if (type === '-boost') {
+        changes.push({ ident: parts[2], stat: parts[3], amount: parseInt(parts[4] || '1', 10), absolute: false });
+      } else if (type === '-unboost') {
+        changes.push({ ident: parts[2], stat: parts[3], amount: -parseInt(parts[4] || '1', 10), absolute: false });
+      } else if (type === '-setboost') {
+        changes.push({ ident: parts[2], stat: parts[3], amount: parseInt(parts[4] || '0', 10), absolute: true });
+      } else if (type === '-clearallboost') {
+        for (const stat of ['atk', 'def', 'spa', 'spd', 'spe', 'accuracy', 'evasion']) {
+          changes.push({ ident: parts[2] || '', stat, amount: 0, absolute: true });
+        }
+      }
+    }
+    return changes;
+  }
+
+  /**
+   * Cumulative boost tracker — authoritative source for boosts, bypasses animation queue.
+   * Key: ident (e.g. "p1a: Pikachu"), Value: stat boosts
+   */
+  const trackedBoosts: Record<string, Record<string, number>> = {};
+
+  /** Update cumulative boost tracker from protocol lines */
+  function updateTrackedBoosts(lines: string[]) {
+    for (const line of lines) {
+      const parts = line.split('|');
+      if (parts.length < 3) continue;
+      const type = parts[1];
+      const ident = parts[2] || '';
+
+      if (type === 'switch' || type === 'drag') {
+        // New Pokemon on field — reset boosts for this slot
+        trackedBoosts[ident] = {};
+      } else if (type === '-boost' && parts.length >= 5) {
+        if (!trackedBoosts[ident]) trackedBoosts[ident] = {};
+        const stat = parts[3];
+        const amount = parseInt(parts[4] || '1', 10);
+        trackedBoosts[ident][stat] = Math.min(6, (trackedBoosts[ident][stat] || 0) + amount);
+      } else if (type === '-unboost' && parts.length >= 5) {
+        if (!trackedBoosts[ident]) trackedBoosts[ident] = {};
+        const stat = parts[3];
+        const amount = parseInt(parts[4] || '1', 10);
+        trackedBoosts[ident][stat] = Math.max(-6, (trackedBoosts[ident][stat] || 0) - amount);
+      } else if (type === '-setboost' && parts.length >= 5) {
+        if (!trackedBoosts[ident]) trackedBoosts[ident] = {};
+        trackedBoosts[ident][parts[3]] = parseInt(parts[4] || '0', 10);
+      } else if (type === '-clearallboost') {
+        trackedBoosts[ident] = {};
+      } else if (type === '-copyboost' && parts.length >= 4) {
+        const target = parts[3] || '';
+        trackedBoosts[target] = { ...(trackedBoosts[ident] || {}) };
+      }
+    }
+  }
+
+  /** Apply tracked boosts to snapshot, overriding battle object's potentially stale values */
+  function applyBoostOverrides(snapshot: any, _changes: BoostChange[], battle: any) {
+    const mySide = battle.mySide || battle.nearSide;
+    const myPrefix = (mySide?.sideid || 'p1') as string;
+    const oppPrefix = myPrefix === 'p1' ? 'p2' : 'p1';
+
+    for (const [ident, boosts] of Object.entries(trackedBoosts)) {
+      if (ident.startsWith(myPrefix + 'a')) {
+        snapshot.player.active.boosts = { ...boosts };
+      } else if (ident.startsWith(oppPrefix + 'a')) {
+        snapshot.opponent.active.boosts = { ...boosts };
+      }
+    }
+  }
+
   waitForApp(() => {
     const app = (window as any).app;
     const origReceive = app.receive.bind(app);
@@ -208,12 +291,18 @@
       const roomId = data.slice(1, newline > 0 ? newline : undefined);
       const lines = data.slice(newline + 1).split('\n');
 
+      // Track boosts from ALL protocol messages (cumulative, resets on switch)
+      updateTrackedBoosts(lines);
+
       // Post raw protocol for opponent model tracking
       window.postMessage({ source: SOURCE, type: 'PS_PROTOCOL_MSG', roomId, raw: data }, '*');
 
       // Check if this batch contains a request (turn action needed)
       const hasRequest = lines.some(l => l.startsWith('|request|'));
       if (!hasRequest) return;
+
+      // Parse boost changes from protocol (battle object may lag due to animation queue)
+      const boostOverrides = parseBoostsFromProtocol(lines);
 
       // Poll until battle.mySide.active[0] is populated (or timeout)
       const pollStart = Date.now();
@@ -222,6 +311,8 @@
         if (battle?.mySide?.active[0]?.speciesForme || Date.now() - pollStart > 500) {
           const snapshot = extractSnapshot(roomId);
           if (snapshot && snapshot.availableActions.length > 0) {
+            // Apply boost overrides from protocol parsing
+            applyBoostOverrides(snapshot, boostOverrides, battle);
             window.postMessage({ source: SOURCE, type: 'PS_TURN_REQUEST', snapshot }, '*');
           }
         } else {

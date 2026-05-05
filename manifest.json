@@ -20,7 +20,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["src/inject/hook.ts", "src/eval/eval-worker.ts"],
+      "resources": ["src/inject/hook.ts", "src/eval/eval-worker.ts", "data/gen9randombattle.json"],
       "matches": ["*://play.pokemonshowdown.com/*", "*://*.psim.us/*"]
     }
   ]
