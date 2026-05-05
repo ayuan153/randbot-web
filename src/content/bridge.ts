@@ -12,7 +12,7 @@ import {
   revealAbility,
 } from '../eval/opponent-model';
 import { mountOverlay } from '../ui/overlay';
-import { TurnLogger } from '../logging/turn-logger';
+import { TurnLogger, OpponentModelSnapshot } from '../logging/turn-logger';
 
 const HOOK_SOURCE = 'randbats-bot-hook';
 
@@ -37,6 +37,20 @@ function getModel(roomId: string): OpponentModel {
     roomModels.set(roomId, createOpponentModel(6));
   }
   return roomModels.get(roomId)!;
+}
+
+/** Extract a snapshot of the opponent model state for turn logging */
+function getOpponentModelSnapshot(model: OpponentModel): OpponentModelSnapshot[] {
+  return model.pokemon.map(p => ({
+    species: p.species,
+    remainingSetCount: p.possibleSets.length,
+    topSetProbability: p.possibleSets.length > 0
+      ? Math.max(...p.possibleSets.map(ws => ws.probability))
+      : 0,
+    revealedMoves: p.revealedMoves,
+    revealedAbility: p.revealedAbility,
+    revealedItem: p.revealedItem,
+  }));
 }
 
 /**
@@ -198,9 +212,10 @@ function handleResult(result: EvalResult, updateOverlay: ReturnType<typeof mount
   const snapshot = prevSnapshot ?? null;
   const model = snapshot ? getModel(snapshot.roomId) : null;
   updateOverlay(result.options, result.turn, result.elapsedMs, snapshot, model);
-  // Log turn with the snapshot we stored
+  // Log turn with the snapshot we stored, including opponent model state
   if (prevSnapshot && prevSnapshot.turn === result.turn) {
-    turnLogger.logTurn(result.turn, prevSnapshot, result.options);
+    const modelState = model ? getOpponentModelSnapshot(model) : undefined;
+    turnLogger.logTurn(result.turn, prevSnapshot, result.options, modelState);
   }
 }
 
