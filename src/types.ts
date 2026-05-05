@@ -29,6 +29,12 @@ export interface PokemonState {
   terastallized: boolean;
   /** Computed stats at level (from request data for player's Pokemon) */
   stats?: Record<string, number>;
+  /** EVs inferred from randbats set data */
+  evs?: Record<string, number>;
+  /** IVs inferred from randbats set data */
+  ivs?: Record<string, number>;
+  /** Nature inferred from randbats set data */
+  nature?: string;
 }
 
 export interface FieldState {
@@ -141,6 +147,7 @@ export interface DamageCalcDebugInfo {
 
 export interface ScoreBreakdown {
   damage: number;
+  damageRange?: { min: number; max: number; avg: number };
   koProbability: number;
   statusValue: number;
   hazardValue: number;

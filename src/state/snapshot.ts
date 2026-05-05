@@ -6,6 +6,7 @@
  */
 
 import type { BattleSnapshot, PokemonState, SideFieldState, Action } from '../types';
+import { getSetsForSpecies } from './sets-db';
 
 /** Parse PS condition string like "267/300 brn" or "0 fnt" */
 export function parseCondition(cond: string): { hp: number; hpMax: number; status: string | null } {
@@ -121,6 +122,40 @@ export function deriveFormat(roomId: string): string {
 }
 
 /**
+ * Infer EVs/IVs/nature for a player's Pokemon by matching against randbats set data.
+ * Uses known moves/ability/item to narrow to the best-matching set.
+ */
+function inferSetData(species: string, moves: string[], ability: string | null, item: string | null): { evs?: Record<string, number>; ivs?: Record<string, number>; nature?: string } {
+  const sets = getSetsForSpecies(species);
+  if (sets.length === 0) return {};
+
+  const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  // Score each set by how many known attributes match
+  let bestSet = sets[0];
+  let bestScore = -1;
+
+  for (const set of sets) {
+    let score = 0;
+    if (ability && normalize(set.ability) === normalize(ability)) score += 2;
+    if (item && normalize(set.item) === normalize(item)) score += 2;
+    for (const move of moves) {
+      if (set.moves.some(m => normalize(m) === normalize(move))) score += 1;
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      bestSet = set;
+    }
+  }
+
+  return {
+    evs: Object.keys(bestSet.evs).length > 0 ? bestSet.evs : undefined,
+    ivs: Object.keys(bestSet.ivs).length > 0 ? bestSet.ivs : undefined,
+    nature: bestSet.nature || undefined,
+  };
+}
+
+/**
  * Extract a full BattleSnapshot from PS page objects.
  * This is the reference implementation — hook.ts inlines equivalent logic.
  */
@@ -153,6 +188,7 @@ export function extractSnapshot(
   if ((myActive.species === 'unknown' || myActive.hp === 0) && activeReqMon) {
     const { species, level } = parseDetails(activeReqMon.details);
     const { hp, hpMax, status } = parseCondition(activeReqMon.condition || '');
+    const setData = inferSetData(species, activeReqMon.moves || [], activeReqMon.ability || activeReqMon.baseAbility || null, activeReqMon.item || null);
     myActive = {
       species, level, hp, hpMax, status,
       boosts: {},
@@ -162,6 +198,9 @@ export function extractSnapshot(
       teraType: null,
       terastallized: false,
       stats: activeReqMon.stats ? { ...activeReqMon.stats } : undefined,
+      evs: setData.evs,
+      ivs: setData.ivs,
+      nature: setData.nature,
     };
   }
 
@@ -175,12 +214,21 @@ export function extractSnapshot(
     myActive.stats = { ...activeReqMon.stats };
   }
 
+  // Enrich active EVs/IVs/nature from randbats data if not already set
+  if (!myActive.evs) {
+    const setData = inferSetData(myActive.species, myActive.moves, myActive.ability, myActive.item);
+    myActive.evs = setData.evs;
+    myActive.ivs = setData.ivs;
+    myActive.nature = setData.nature;
+  }
+
   // Bench from request (our team, full info)
   const myBench: PokemonState[] = (request.side?.pokemon || [])
     .filter(p => !p.active && !p.condition?.startsWith('0'))
     .map(p => {
       const { species, level } = parseDetails(p.details);
       const { hp, hpMax, status } = parseCondition(p.condition || '');
+      const setData = inferSetData(species, p.moves || [], p.ability || p.baseAbility || null, p.item || null);
       return {
         species, level, hp, hpMax, status,
         boosts: {},
@@ -190,6 +238,9 @@ export function extractSnapshot(
         teraType: null,
         terastallized: false,
         stats: p.stats ? { ...p.stats } : undefined,
+        evs: setData.evs,
+        ivs: setData.ivs,
+        nature: setData.nature,
       };
     });
 
