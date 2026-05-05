@@ -7,12 +7,10 @@
  */
 
 import type { BattleSnapshot, ScoredOption, EvalConfig, OpponentModel, Action, PokemonState, MoveAction, FieldState } from '../types';
-import { evaluate, tacticalBreakdown, tacticalScore, evaluateSwitchMatchup } from './scoring';
+import { evaluate, tacticalBreakdown, evaluateSwitchMatchup } from './scoring';
 import { calculateDamage, DefenderOverrides } from './damage';
 import { getLikelyMoves, getMostLikelySet, getRemainingSetProbabilities } from './opponent-model';
 
-const MINIMAX_WEIGHT = 0.7;
-const TACTICAL_WEIGHT = 0.3;
 
 /**
  * Run expectiminimax search and return scored options.
@@ -60,12 +58,11 @@ export function search(
       ? tacticalBreakdown(snapshot, action.id, getDefenderOverrides(opponentModel, snapshot.opponent.active.species))
       : switchBreakdown(snapshot, action);
 
-    const tactical = tacticalScore(breakdown);
-    const score = MINIMAX_WEIGHT * normalizeMinimaxValue(minimaxValue) + TACTICAL_WEIGHT * tactical;
+    const minimaxNormalized = normalizeMinimaxValue(minimaxValue);
 
     results.push({
       action,
-      score: Math.max(0, Math.min(1, score)),
+      score: Math.max(0, Math.min(1, minimaxNormalized)),
       breakdown,
       principalVariation: pv,
     });
