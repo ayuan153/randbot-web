@@ -43,6 +43,9 @@ const dbReady = new Promise<void>((resolve) => { dbReadyResolve = resolve; });
 /** Buffered protocol messages received before DB was ready */
 const protocolBuffer: Array<{ roomId: string; raw: string }> = [];
 
+/** Buffered turn requests received before DB was ready */
+const pendingTurnRequests: Array<{ snapshot: BattleSnapshot; roomId: string }> = [];
+
 /** Protocol lines accumulated since last turn, keyed by roomId */
 const protocolAccumulator = new Map<string, string[]>();
 
@@ -283,48 +286,55 @@ function listenForHookMessages(updateOverlay: ReturnType<typeof mountOverlay>) {
     }
 
     if (msg.type === 'PS_TURN_REQUEST') {
-      const snapshot: BattleSnapshot = msg.snapshot;
-      const roomId = snapshot.roomId;
-      const model = getModel(roomId);
-
-      // Bug 3 fix: if opponent active is 'unknown', fill from model's most recent reveal
-      // Only fill if we know which side is the opponent (prefix is set)
-      if (snapshot.opponent.active.species === 'unknown' && model.pokemon.length > 0 && roomOpponentPrefix.has(roomId)) {
-        // The last revealed pokemon in the model is the current active (from trackProtocol processing |switch|)
-        const lastRevealed = model.pokemon[model.pokemon.length - 1];
-        if (lastRevealed) {
-          snapshot.opponent.active.species = lastRevealed.species;
-          if (!snapshot.opponent.active.ability && lastRevealed.revealedAbility) {
-            snapshot.opponent.active.ability = lastRevealed.revealedAbility;
-          }
-        }
+      if (!isLoaded()) {
+        pendingTurnRequests.push({ snapshot: msg.snapshot, roomId: msg.snapshot.roomId });
+        return;
       }
+      processTurnRequest(msg.snapshot, updateOverlay);
+    }
+  });
+}
 
-      // Start logging if this is a new battle
-      if (!turnLogger.active || turnLogger.battleId !== roomId) {
-        turnLogger.startBattle(roomId, snapshot.format);
+function processTurnRequest(snapshot: BattleSnapshot, updateOverlay: ReturnType<typeof mountOverlay>) {
+  const roomId = snapshot.roomId;
+  const model = getModel(roomId);
+
+  // Bug 3 fix: if opponent active is 'unknown', fill from model's most recent reveal
+  // Only fill if we know which side is the opponent (prefix is set)
+  if (snapshot.opponent.active.species === 'unknown' && model.pokemon.length > 0 && roomOpponentPrefix.has(roomId)) {
+    // The last revealed pokemon in the model is the current active (from trackProtocol processing |switch|)
+    const lastRevealed = model.pokemon[model.pokemon.length - 1];
+    if (lastRevealed) {
+      snapshot.opponent.active.species = lastRevealed.species;
+      if (!snapshot.opponent.active.ability && lastRevealed.revealedAbility) {
+        snapshot.opponent.active.ability = lastRevealed.revealedAbility;
       }
+    }
+  }
 
-      // Record outcome for previous turn by comparing HP deltas
-      if (prevSnapshot && prevSnapshot.turn < snapshot.turn) {
-        recordOutcomeFromDelta(prevSnapshot, snapshot);
-      }
-      prevSnapshot = snapshot;
+  // Start logging if this is a new battle
+  if (!turnLogger.active || turnLogger.battleId !== roomId) {
+    turnLogger.startBattle(roomId, snapshot.format);
+  }
 
-      const evalRequest = {
-        type: 'EVAL_REQUEST' as const,
-        payload: {
-          snapshot,
-          opponentModel: model,
-          config: DEFAULT_CONFIG,
-        },
-      };
+  // Record outcome for previous turn by comparing HP deltas
+  if (prevSnapshot && prevSnapshot.turn < snapshot.turn) {
+    recordOutcomeFromDelta(prevSnapshot, snapshot);
+  }
+  prevSnapshot = snapshot;
 
-      chrome.runtime.sendMessage(evalRequest, (response) => {
-        if (response?.type === 'EVAL_RESULT') {
-          handleResult(response.payload, updateOverlay);
-        }
-      });
+  const evalRequest = {
+    type: 'EVAL_REQUEST' as const,
+    payload: {
+      snapshot,
+      opponentModel: model,
+      config: DEFAULT_CONFIG,
+    },
+  };
+
+  chrome.runtime.sendMessage(evalRequest, (response) => {
+    if (response?.type === 'EVAL_RESULT') {
+      handleResult(response.payload, updateOverlay);
     }
   });
 }
@@ -338,6 +348,7 @@ function listenForSwMessages(updateOverlay: ReturnType<typeof mountOverlay>) {
 }
 
 injectHook();
+const updateOverlay = mountOverlay(downloadLog);
 const setsUrl = chrome.runtime.getURL('data/gen9randombattle.json');
 loadSetsDb(setsUrl).then(() => {
   console.log('[randbats-bot] Sets DB loaded');
@@ -346,11 +357,15 @@ loadSetsDb(setsUrl).then(() => {
     trackProtocolInner(roomId, raw);
   }
   protocolBuffer.length = 0;
+  // Process any turn requests that arrived before DB was ready
+  for (const { snapshot } of pendingTurnRequests) {
+    processTurnRequest(snapshot, updateOverlay);
+  }
+  pendingTurnRequests.length = 0;
   dbReadyResolve();
 }).catch((err) => {
   console.error('[randbats-bot] Failed to load sets DB:', err);
 });
-const updateOverlay = mountOverlay(downloadLog);
 listenForHookMessages(updateOverlay);
 listenForSwMessages(updateOverlay);
 console.log('[randbats-bot] Content script loaded');
