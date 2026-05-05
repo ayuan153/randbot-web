@@ -53,13 +53,17 @@ function Overlay({ options, turn, elapsedMs, snapshot, opponentModel, onDownload
         <span class="overlay-toggle">{collapsed ? '▶' : '▼'}</span>
       </div>
       {!collapsed && (
-        <div class="overlay-body">
-          {options.length === 0 && <div class="overlay-empty">Waiting for turn...</div>}
-          {options.map((opt, i) => (
-            <SuggestionCard key={i} option={opt} rank={i + 1} />
-          ))}
+        <div class={`overlay-content ${devMode ? 'overlay-content-dev' : ''}`}>
+          <div class="overlay-body">
+            {options.length === 0 && <div class="overlay-empty">Waiting for turn...</div>}
+            {options.map((opt, i) => (
+              <SuggestionCard key={i} option={opt} rank={i + 1} />
+            ))}
+          </div>
           {devMode && (
-            <DevPanel snapshot={snapshot} options={options} opponentModel={opponentModel} />
+            <div class="overlay-dev-side">
+              <DevPanel snapshot={snapshot} options={options} opponentModel={opponentModel} />
+            </div>
           )}
         </div>
       )}
@@ -114,7 +118,8 @@ function getStyles(): string {
       bottom: 20px;
       right: 20px;
       z-index: 99999;
-      width: 280px;
+      width: fit-content;
+      min-width: 280px;
       background: #1a1a2e;
       border: 1px solid #16213e;
       border-radius: 8px;
@@ -123,6 +128,16 @@ function getStyles(): string {
       font-size: 13px;
       color: #e0e0e0;
       overflow: hidden;
+    }
+    .overlay-content {
+      display: flex;
+      flex-direction: row;
+    }
+    .overlay-content-dev {
+      width: 680px;
+    }
+    .overlay-content-dev ~ .randbats-overlay {
+      width: auto;
     }
     .overlay-header {
       display: flex;
@@ -162,6 +177,16 @@ function getStyles(): string {
       padding: 8px;
       max-height: 400px;
       overflow-y: auto;
+      width: 280px;
+      flex-shrink: 0;
+    }
+    .overlay-dev-side {
+      width: 400px;
+      max-height: 400px;
+      overflow-y: auto;
+      padding: 8px;
+      border-left: 1px solid #333;
+      flex-shrink: 0;
     }
     .overlay-empty {
       text-align: center;
@@ -235,9 +260,6 @@ function getStyles(): string {
       background: rgba(76, 175, 80, 0.1);
     }
     .dev-panel {
-      margin-top: 8px;
-      padding-top: 8px;
-      border-top: 1px solid #333;
       font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
       font-size: 10px;
       line-height: 1.4;
