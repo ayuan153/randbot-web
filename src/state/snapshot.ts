@@ -138,7 +138,7 @@ export function extractSnapshot(
   },
   request: {
     active?: Array<{ moves?: Array<{ id: string; move: string; pp: number; maxpp: number; target?: string; disabled?: boolean }> }>;
-    side?: { pokemon?: Array<{ active?: boolean; condition?: string; details: string; moves?: string[]; item?: string; ability?: string; baseAbility?: string }> };
+    side?: { pokemon?: Array<{ active?: boolean; condition?: string; details: string; moves?: string[]; item?: string; ability?: string; baseAbility?: string; stats?: Record<string, number> }> };
   },
 ): BattleSnapshot | null {
   const mySide = battle.mySide || battle.nearSide;
@@ -151,6 +151,12 @@ export function extractSnapshot(
   // Enrich active moves from request
   if (request.active?.[0]?.moves) {
     myActive.moves = request.active[0].moves.map(m => m.move || m.id);
+  }
+
+  // Enrich active stats from request (player's active is first in request.side.pokemon)
+  const activeReqMon = request.side?.pokemon?.find(p => p.active);
+  if (activeReqMon?.stats) {
+    myActive.stats = { ...activeReqMon.stats };
   }
 
   // Bench from request (our team, full info)
@@ -167,6 +173,7 @@ export function extractSnapshot(
         ability: p.ability || p.baseAbility || null,
         teraType: null,
         terastallized: false,
+        stats: p.stats ? { ...p.stats } : undefined,
       };
     });
 

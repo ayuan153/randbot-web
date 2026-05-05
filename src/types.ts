@@ -27,6 +27,8 @@ export interface PokemonState {
   ability: string | null;
   teraType: string | null;
   terastallized: boolean;
+  /** Computed stats at level (from request data for player's Pokemon) */
+  stats?: Record<string, number>;
 }
 
 export interface FieldState {

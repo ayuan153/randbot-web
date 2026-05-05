@@ -16,6 +16,8 @@ export interface DamageResult {
   avgDmg: number;
   koChance: number;
   rolls: number[];
+  /** The defender's real max HP (computed from stats, not percentage) */
+  realMaxHP: number;
 }
 
 export interface DefenderOverrides {
@@ -131,17 +133,19 @@ export function calculateDamage(
     const koRolls = rolls.filter(d => d >= defenderActualCurHP).length;
     const koChance = rolls.length > 0 ? koRolls / rolls.length : 0;
 
-    return { move: moveName, minDmg, maxDmg, avgDmg, koChance, rolls };
+    return { move: moveName, minDmg, maxDmg, avgDmg, koChance, rolls, realMaxHP };
   } catch {
     // Move doesn't exist or calc fails — return zero damage
-    return { move: moveName, minDmg: 0, maxDmg: 0, avgDmg: 0, koChance: 0, rolls: [] };
+    return { move: moveName, minDmg: 0, maxDmg: 0, avgDmg: 0, koChance: 0, rolls: [], realMaxHP: 0 };
   }
 }
 
 /**
  * Calculate damage as a percentage of defender's max HP.
+ * Uses the real max HP from the calc result when available (handles percentage-based HP).
  */
 export function damagePercent(result: DamageResult, defenderMaxHp: number): number {
-  if (defenderMaxHp <= 0) return 0;
-  return result.avgDmg / defenderMaxHp;
+  const hp = result.realMaxHP > 0 ? result.realMaxHP : defenderMaxHp;
+  if (hp <= 0) return 0;
+  return result.avgDmg / hp;
 }

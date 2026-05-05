@@ -101,7 +101,7 @@ function evaluateMove(
 
   if (depth <= 0 || oppMoves.length === 0) {
     // Leaf: evaluate resulting state after our move
-    const resultState = applyDamage(snapshot, 'opponent', ourDmg.avgDmg);
+    const resultState = applyDamage(snapshot, 'opponent', ourDmg.avgDmg, ourDmg.realMaxHP);
     return evaluate(resultState);
   }
 
@@ -120,8 +120,8 @@ function evaluateMove(
     );
 
     // State after both moves (simplified: apply both damages)
-    const afterOurMove = applyDamage(snapshot, 'opponent', ourDmg.avgDmg);
-    const afterBoth = applyDamage(afterOurMove, 'player', oppDmg.avgDmg);
+    const afterOurMove = applyDamage(snapshot, 'opponent', ourDmg.avgDmg, ourDmg.realMaxHP);
+    const afterBoth = applyDamage(afterOurMove, 'player', oppDmg.avgDmg, oppDmg.realMaxHP);
 
     const value = evaluate(afterBoth);
     // Weight by probability, take minimum (opponent plays optimally)
@@ -169,7 +169,7 @@ function evaluateSwitch(
       oppAtkOverrides,
     );
 
-    const afterHit = applyDamage(newSnapshot, 'player', oppDmg.avgDmg);
+    const afterHit = applyDamage(newSnapshot, 'player', oppDmg.avgDmg, oppDmg.realMaxHP);
     const value = evaluate(afterHit) * oppMove.probability;
     if (value < worstValue) worstValue = value;
   }
@@ -213,10 +213,16 @@ function getDefenderOverrides(model: OpponentModel, species: string): DefenderOv
   };
 }
 
-/** Apply damage to a side's active pokemon (returns new snapshot) */
-function applyDamage(snapshot: BattleSnapshot, side: 'player' | 'opponent', damage: number): BattleSnapshot {
+/** Apply damage to a side's active pokemon (returns new snapshot).
+ *  realMaxHP is the defender's actual max HP from the calc (handles percentage HP conversion). */
+function applyDamage(snapshot: BattleSnapshot, side: 'player' | 'opponent', damage: number, realMaxHP?: number): BattleSnapshot {
   const target = side === 'player' ? snapshot.player.active : snapshot.opponent.active;
-  const newHp = Math.max(0, target.hp - damage);
+  // If target uses percentage HP (hpMax=100) and we know the real max HP, convert damage to percentage scale
+  let scaledDamage = damage;
+  if (target.hpMax === 100 && realMaxHP && realMaxHP !== 100) {
+    scaledDamage = (damage / realMaxHP) * 100;
+  }
+  const newHp = Math.max(0, target.hp - scaledDamage);
   const newActive: PokemonState = { ...target, hp: newHp, status: newHp <= 0 ? 'fnt' : target.status };
 
   if (side === 'player') {
