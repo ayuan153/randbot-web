@@ -97,6 +97,21 @@
     const myActive = extractPokemonState(mySide.active?.[0]);
     const oppActive = extractPokemonState(oppSide.active?.[0]);
 
+    // Fallback: if active mon is not populated from battle state, use request.side.pokemon
+    const activeReqMon = request.side?.pokemon?.find((p: any) => p.active);
+    if ((myActive.species === 'unknown' || myActive.hp === 0) && activeReqMon) {
+      const { species, level } = parseDetails(activeReqMon.details);
+      const { hp, hpMax, status } = parseCondition(activeReqMon.condition);
+      myActive.species = species;
+      myActive.level = level;
+      myActive.hp = hp;
+      myActive.hpMax = hpMax;
+      myActive.status = status;
+      myActive.moves = activeReqMon.moves || [];
+      myActive.item = activeReqMon.item || null;
+      myActive.ability = activeReqMon.ability || activeReqMon.baseAbility || null;
+    }
+
     // Enrich our active with request data (has exact stats, moves, item)
     if (request.active?.[0]) {
       const reqMoves = request.active[0].moves || [];
@@ -200,13 +215,20 @@
       const hasRequest = lines.some(l => l.startsWith('|request|'));
       if (!hasRequest) return;
 
-      // Small delay to let PS finish updating battle state
-      setTimeout(() => {
-        const snapshot = extractSnapshot(roomId);
-        if (snapshot && snapshot.availableActions.length > 0) {
-          window.postMessage({ source: SOURCE, type: 'PS_TURN_REQUEST', snapshot }, '*');
+      // Poll until battle.mySide.active[0] is populated (or timeout)
+      const pollStart = Date.now();
+      const pollForActive = () => {
+        const battle = app.rooms[roomId]?.battle;
+        if (battle?.mySide?.active[0]?.speciesForme || Date.now() - pollStart > 500) {
+          const snapshot = extractSnapshot(roomId);
+          if (snapshot && snapshot.availableActions.length > 0) {
+            window.postMessage({ source: SOURCE, type: 'PS_TURN_REQUEST', snapshot }, '*');
+          }
+        } else {
+          setTimeout(pollForActive, 50);
         }
-      }, 50);
+      };
+      pollForActive();
     };
 
     console.log('[randbats-bot] Hook installed');

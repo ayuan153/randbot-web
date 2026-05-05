@@ -145,8 +145,25 @@ export function extractSnapshot(
   const oppSide = battle.farSide;
   if (!mySide || !oppSide) return null;
 
-  const myActive = extractPokemonState(mySide.active?.[0] as Parameters<typeof extractPokemonState>[0]);
+  let myActive = extractPokemonState(mySide.active?.[0] as Parameters<typeof extractPokemonState>[0]);
   const oppActive = extractPokemonState(oppSide.active?.[0] as Parameters<typeof extractPokemonState>[0]);
+
+  // Fallback: if active mon is not populated from battle state, use request.side.pokemon
+  const activeReqMon = request.side?.pokemon?.find(p => p.active);
+  if ((myActive.species === 'unknown' || myActive.hp === 0) && activeReqMon) {
+    const { species, level } = parseDetails(activeReqMon.details);
+    const { hp, hpMax, status } = parseCondition(activeReqMon.condition || '');
+    myActive = {
+      species, level, hp, hpMax, status,
+      boosts: {},
+      moves: activeReqMon.moves || [],
+      item: activeReqMon.item || null,
+      ability: activeReqMon.ability || activeReqMon.baseAbility || null,
+      teraType: null,
+      terastallized: false,
+      stats: activeReqMon.stats ? { ...activeReqMon.stats } : undefined,
+    };
+  }
 
   // Enrich active moves from request
   if (request.active?.[0]?.moves) {
@@ -154,8 +171,7 @@ export function extractSnapshot(
   }
 
   // Enrich active stats from request (player's active is first in request.side.pokemon)
-  const activeReqMon = request.side?.pokemon?.find(p => p.active);
-  if (activeReqMon?.stats) {
+  if (activeReqMon?.stats && !myActive.stats) {
     myActive.stats = { ...activeReqMon.stats };
   }
 
