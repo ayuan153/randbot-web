@@ -186,10 +186,10 @@ function hazardMoveValue(snapshot: BattleSnapshot): number {
 
 // ─── Switch Evaluation ──────────────────────────────────────────
 
-const W_SWITCH_DEFENSIVE = 0.35;
-const W_SWITCH_OFFENSIVE = 0.25;
-const W_SWITCH_SPEED = 0.15;
-const W_SWITCH_HP = 0.15;
+const W_SWITCH_DEFENSIVE = 0.40;
+const W_SWITCH_OFFENSIVE = 0.30;
+const W_SWITCH_SPEED = 0.10;
+const W_SWITCH_HP = 0.10;
 const W_SWITCH_ROLE = 0.10;
 
 /**
@@ -231,10 +231,10 @@ function defensiveMatchup(switchIn: PokemonState, opponent: PokemonState): numbe
   }
   const avgEff = totalEff / attackingTypes.length;
 
-  // Map effectiveness to 0-1 score: 0.25 (4x resist) → 1, 1 (neutral) → 0.5, 4 (4x weak) → 0
+  // Map effectiveness to 0-1 score: 0.25 (4x resist) → ~1.0, 1 (neutral) → 0.5, 4 (4x weak) → ~0.0
   // Using log2: log2(0.25)=-2, log2(1)=0, log2(4)=2
-  // Score = 0.5 - log2(avgEff) * 0.25, clamped to [0, 1]
-  return Math.max(0, Math.min(1, 0.5 - Math.log2(avgEff) * 0.25));
+  // Score = 0.5 - log2(avgEff) * 0.4, clamped to [0, 1]
+  return Math.max(0, Math.min(1, 0.5 - Math.log2(avgEff) * 0.4));
 }
 
 /**
@@ -256,8 +256,11 @@ function offensiveMatchup(switchIn: PokemonState, opponent: PokemonState): numbe
     if (eff > bestEff) bestEff = eff;
   }
 
-  // Map: 4 (4x SE) → 1, 2 (SE) → 0.75, 1 (neutral) → 0.5, 0.5 (resist) → 0.25, 0.25 → 0
-  return Math.max(0, Math.min(1, 0.5 + Math.log2(bestEff) * 0.25));
+  // Map: 4 (4x SE) → ~0.95, 2 (SE) → ~0.75, 1 (neutral) → 0.5, 0.5 (resist) → ~0.25, 0.25 → ~0.05
+  // Using log2: log2(4)=2, log2(2)=1, log2(1)=0, log2(0.5)=-1, log2(0.25)=-2
+  // Score = 0.5 + log2(bestEff) * 0.4, clamped to [0, 1]; immune (0) → 0
+  if (bestEff === 0) return 0;
+  return Math.max(0, Math.min(1, 0.5 + Math.log2(bestEff) * 0.4));
 }
 
 /**

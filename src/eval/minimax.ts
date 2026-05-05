@@ -58,15 +58,16 @@ export function search(
       ? tacticalBreakdown(snapshot, action.id, getDefenderOverrides(opponentModel, snapshot.opponent.active.species))
       : switchBreakdown(snapshot, action);
 
-    const minimaxNormalized = normalizeMinimaxValue(minimaxValue);
-
     results.push({
       action,
-      score: Math.max(0, Math.min(1, minimaxNormalized)),
+      score: minimaxValue, // raw value, will be normalized below
       breakdown,
       principalVariation: pv,
     });
   }
+
+  // Normalize scores relative to each other within this turn (0-100 scale)
+  normalizeScoresRelative(results);
 
   // Sort by score descending, take topN
   results.sort((a, b) => b.score - a.score);
@@ -269,4 +270,27 @@ function applyDamage(snapshot: BattleSnapshot, side: 'player' | 'opponent', dama
 /** Normalize minimax value from [-1, 1] to [0, 1] for scoring */
 function normalizeMinimaxValue(value: number): number {
   return (value + 1) / 2;
+}
+
+/**
+ * Normalize scores relative to each other within the same turn.
+ * Best option → 100, worst → 0. If all equal, all get 50.
+ * Mutates the results array in place.
+ */
+function normalizeScoresRelative(results: ScoredOption[]): void {
+  if (results.length === 0) return;
+
+  const scores = results.map(r => r.score);
+  const minScore = Math.min(...scores);
+  const maxScore = Math.max(...scores);
+  const range = maxScore - minScore;
+
+  for (const result of results) {
+    if (range < 1e-9) {
+      // All options are effectively equal
+      result.score = 50;
+    } else {
+      result.score = ((result.score - minScore) / range) * 100;
+    }
+  }
 }
