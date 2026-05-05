@@ -288,9 +288,9 @@ function normalizeScoresRelative(results: ScoredOption[]): void {
   for (const result of results) {
     if (range < 1e-9) {
       // All options are effectively equal
-      result.score = 50;
+      result.score = 0.5;
     } else {
-      result.score = ((result.score - minScore) / range) * 100;
+      result.score = (result.score - minScore) / range;
     }
   }
 }

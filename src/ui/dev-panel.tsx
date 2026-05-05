@@ -20,15 +20,29 @@ interface DevPanelProps {
   opponentModel: OpponentModel | null;
 }
 
+/** If all remaining sets for a species agree on ability or item, return it; else null */
+function getInferredValue(species: string, model: OpponentModel | null, field: 'ability' | 'item'): string | null {
+  if (!model) return null;
+  const mon = model.pokemon.find(p => p.species === species);
+  if (!mon || mon.possibleSets.length === 0) return null;
+  const values = mon.possibleSets.map(ws => ws.set[field]);
+  const allSame = values.every(v => v === values[0]);
+  return allSame ? values[0] : null;
+}
+
 export function DevPanel({ snapshot, options, opponentModel }: DevPanelProps) {
   if (!snapshot) {
     return <div class="dev-panel"><div class="dev-section">No snapshot available</div></div>;
   }
 
+  const oppActive = snapshot.opponent.active;
+  const inferredAbility = getInferredValue(oppActive.species, opponentModel, 'ability');
+  const inferredItem = getInferredValue(oppActive.species, opponentModel, 'item');
+
   return (
     <div class="dev-panel">
       <ActiveSection label="My Active" pokemon={snapshot.player.active} />
-      <ActiveSection label="Opp Active" pokemon={snapshot.opponent.active} />
+      <ActiveSection label="Opp Active" pokemon={oppActive} inferredAbility={inferredAbility} inferredItem={inferredItem} />
       {opponentModel && <OpponentModelSection model={opponentModel} />}
       {options.length > 0 && options[0].debugInfo && (
         <DamageCalcSection debugInfo={options[0].debugInfo} />
@@ -38,11 +52,14 @@ export function DevPanel({ snapshot, options, opponentModel }: DevPanelProps) {
   );
 }
 
-function ActiveSection({ label, pokemon }: { label: string; pokemon: PokemonState }) {
+function ActiveSection({ label, pokemon, inferredAbility, inferredItem }: { label: string; pokemon: PokemonState; inferredAbility?: string | null; inferredItem?: string | null }) {
   const boostStr = Object.entries(pokemon.boosts)
     .filter(([, v]) => v !== 0)
     .map(([k, v]) => `${k}${v > 0 ? '+' : ''}${v}`)
     .join(' ');
+
+  const abilityDisplay = pokemon.ability || (inferredAbility ? `${inferredAbility} (inferred)` : '???');
+  const itemDisplay = pokemon.item || (inferredItem ? `${inferredItem} (inferred)` : '???');
 
   return (
     <div class="dev-section">
@@ -54,10 +71,10 @@ function ActiveSection({ label, pokemon }: { label: string; pokemon: PokemonStat
         <span class="dev-label">HP:</span> {pokemon.hp}/{pokemon.hpMax} ({Math.round((pokemon.hp / pokemon.hpMax) * 100)}%)
       </div>
       <div class="dev-row">
-        <span class="dev-label">Ability:</span> {pokemon.ability || '???'}
+        <span class="dev-label">Ability:</span> {abilityDisplay}
       </div>
       <div class="dev-row">
-        <span class="dev-label">Item:</span> {pokemon.item || '???'}
+        <span class="dev-label">Item:</span> {itemDisplay}
       </div>
       <div class="dev-row">
         <span class="dev-label">Moves:</span> {pokemon.moves.length > 0 ? pokemon.moves.join(', ') : 'none revealed'}

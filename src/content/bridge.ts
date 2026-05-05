@@ -282,6 +282,18 @@ function listenForHookMessages(updateOverlay: ReturnType<typeof mountOverlay>) {
       const roomId = snapshot.roomId;
       const model = getModel(roomId);
 
+      // Bug 3 fix: if opponent active is 'unknown', fill from model's most recent reveal
+      if (snapshot.opponent.active.species === 'unknown' && model.pokemon.length > 0) {
+        // The last revealed pokemon in the model is the current active (from trackProtocol processing |switch|)
+        const lastRevealed = model.pokemon[model.pokemon.length - 1];
+        if (lastRevealed) {
+          snapshot.opponent.active.species = lastRevealed.species;
+          if (!snapshot.opponent.active.ability && lastRevealed.revealedAbility) {
+            snapshot.opponent.active.ability = lastRevealed.revealedAbility;
+          }
+        }
+      }
+
       // Start logging if this is a new battle
       if (!turnLogger.active || turnLogger.battleId !== roomId) {
         turnLogger.startBattle(roomId, snapshot.format);
