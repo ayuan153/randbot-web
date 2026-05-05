@@ -325,12 +325,9 @@
       const roomId = data.slice(1, newline > 0 ? newline : undefined);
       const lines = data.slice(newline + 1).split('\n');
 
-      // Accumulate lines for this room (reset on |turn| to avoid unbounded growth)
+      // Accumulate lines for this room
       if (!roomProtocolLines[roomId]) roomProtocolLines[roomId] = [];
-      for (const l of lines) {
-        if (l.startsWith('|turn|')) roomProtocolLines[roomId] = [];
-        roomProtocolLines[roomId].push(l);
-      }
+      roomProtocolLines[roomId].push(...lines);
 
       // Track boosts from ALL protocol messages (cumulative, resets on switch)
       updateTrackedBoosts(lines);
@@ -369,6 +366,8 @@
               }
             }
             window.postMessage({ source: SOURCE, type: 'PS_TURN_REQUEST', snapshot }, '*');
+            // Reset protocol accumulator after successful snapshot extraction
+            roomProtocolLines[roomId] = [];
           }
         } else {
           setTimeout(pollForActive, 50);
