@@ -8,8 +8,8 @@
 
 import type { BattleSnapshot, ScoredOption, EvalConfig, OpponentModel, Action, PokemonState, MoveAction } from '../types';
 import { evaluate, tacticalBreakdown, tacticalScore } from './scoring';
-import { calculateDamage } from './damage';
-import { getLikelyMoves } from './opponent-model';
+import { calculateDamage, DefenderOverrides } from './damage';
+import { getLikelyMoves, getMostLikelySet } from './opponent-model';
 
 const MINIMAX_WEIGHT = 0.7;
 const TACTICAL_WEIGHT = 0.3;
@@ -42,7 +42,7 @@ export function search(
 
     if (action.type === 'move') {
       // Simulate our move, then opponent's best response
-      minimaxValue = evaluateMove(snapshot, action, topOppMoves, config.depth - 1);
+      minimaxValue = evaluateMove(snapshot, action, topOppMoves, config.depth - 1, opponentModel);
       pv = [action.name];
 
       // Add opponent's best response to PV
@@ -51,13 +51,13 @@ export function search(
       }
     } else {
       // Switch: evaluate the resulting position
-      minimaxValue = evaluateSwitch(snapshot, action, topOppMoves);
+      minimaxValue = evaluateSwitch(snapshot, action, topOppMoves, opponentModel);
       pv = [`switch ${action.species}`];
     }
 
     // Compute tactical breakdown for root scoring
     const breakdown = action.type === 'move'
-      ? tacticalBreakdown(snapshot, action.id)
+      ? tacticalBreakdown(snapshot, action.id, getDefenderOverrides(opponentModel, snapshot.opponent.active.species))
       : switchBreakdown(snapshot, action);
 
     const tactical = tacticalScore(breakdown);
@@ -84,13 +84,19 @@ function evaluateMove(
   action: MoveAction,
   oppMoves: Array<{ move: string; probability: number }>,
   depth: number,
+  opponentModel: OpponentModel,
 ): number {
+  // Build defender overrides from opponent model
+  const defOverrides = getDefenderOverrides(opponentModel, snapshot.opponent.active.species);
+
   // Our move's damage to opponent
   const ourDmg = calculateDamage(
     snapshot.player.active,
     snapshot.opponent.active,
     action.id,
     snapshot.field,
+    undefined,
+    defOverrides,
   );
 
   if (depth <= 0 || oppMoves.length === 0) {
@@ -103,12 +109,14 @@ function evaluateMove(
   let worstValue = Infinity;
 
   for (const oppMove of oppMoves) {
-    // Opponent's damage to us
+    // Opponent's damage to us (opponent is attacker, player is defender with actual HP)
+    const oppAtkOverrides = getDefenderOverrides(opponentModel, snapshot.opponent.active.species);
     const oppDmg = calculateDamage(
       snapshot.opponent.active,
       snapshot.player.active,
       oppMove.move,
       snapshot.field,
+      oppAtkOverrides,
     );
 
     // State after both moves (simplified: apply both damages)
@@ -133,6 +141,7 @@ function evaluateSwitch(
   snapshot: BattleSnapshot,
   action: { type: 'switch'; species: string; slot: number },
   oppMoves: Array<{ move: string; probability: number }>,
+  opponentModel: OpponentModel,
 ): number {
   // Find the pokemon we're switching to
   const switchIn = snapshot.player.bench.find(p => p.species === action.species);
@@ -151,11 +160,13 @@ function evaluateSwitch(
   // Opponent gets a free hit on our switch-in
   let worstValue = Infinity;
   for (const oppMove of oppMoves) {
+    const oppAtkOverrides = getDefenderOverrides(opponentModel, snapshot.opponent.active.species);
     const oppDmg = calculateDamage(
       snapshot.opponent.active,
       switchIn,
       oppMove.move,
       snapshot.field,
+      oppAtkOverrides,
     );
 
     const afterHit = applyDamage(newSnapshot, 'player', oppDmg.avgDmg);
@@ -188,6 +199,19 @@ function switchBreakdown(
 }
 
 // ─── Helpers ────────────────────────────────────────────────────
+
+/** Build DefenderOverrides from the opponent model's most likely set */
+function getDefenderOverrides(model: OpponentModel, species: string): DefenderOverrides | undefined {
+  const set = getMostLikelySet(model, species);
+  if (!set) return undefined;
+  return {
+    evs: set.evs,
+    ivs: set.ivs,
+    nature: set.nature,
+    ability: set.ability,
+    item: set.item,
+  };
+}
 
 /** Apply damage to a side's active pokemon (returns new snapshot) */
 function applyDamage(snapshot: BattleSnapshot, side: 'player' | 'opponent', damage: number): BattleSnapshot {

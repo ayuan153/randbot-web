@@ -126,6 +126,15 @@ export interface ScoredOption {
   score: number; // normalized 0–1
   breakdown: ScoreBreakdown;
   principalVariation: string[];
+  debugInfo?: DamageCalcDebugInfo;
+}
+
+export interface DamageCalcDebugInfo {
+  attacker: { species: string; stats: Record<string, number>; boosts: Record<string, number> };
+  defender: { species: string; stats: Record<string, number>; boosts: Record<string, number> };
+  move: string;
+  weather: string | null;
+  terrain: string | null;
 }
 
 export interface ScoreBreakdown {

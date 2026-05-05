@@ -5,7 +5,7 @@
  */
 
 import type { BattleSnapshot, PokemonState, ScoreBreakdown, FieldState } from '../types';
-import { calculateDamage, damagePercent } from './damage';
+import { calculateDamage, damagePercent, DefenderOverrides } from './damage';
 
 // ─── Weights ────────────────────────────────────────────────────
 
@@ -105,11 +105,12 @@ function statusWeight(status: string): number {
 export function tacticalBreakdown(
   snapshot: BattleSnapshot,
   moveName: string,
+  defenderOverrides?: DefenderOverrides,
 ): ScoreBreakdown {
   const attacker = snapshot.player.active;
   const defender = snapshot.opponent.active;
 
-  const dmgResult = calculateDamage(attacker, defender, moveName, snapshot.field);
+  const dmgResult = calculateDamage(attacker, defender, moveName, snapshot.field, undefined, defenderOverrides);
   const dmgPct = damagePercent(dmgResult, defender.hpMax);
 
   return {

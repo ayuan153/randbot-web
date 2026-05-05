@@ -18,6 +18,14 @@ export interface DamageResult {
   rolls: number[];
 }
 
+export interface DefenderOverrides {
+  evs?: Partial<Record<string, number>>;
+  ivs?: Partial<Record<string, number>>;
+  nature?: string;
+  ability?: string;
+  item?: string;
+}
+
 /** Map our boost keys to @smogon/calc stat names */
 const BOOST_MAP: Record<string, string> = {
   atk: 'atk', def: 'def', spa: 'spa', spd: 'spd', spe: 'spe',
@@ -54,7 +62,7 @@ function buildField(field: FieldState, attackerIsPlayer: boolean): Field {
 /** Convert our PokemonState to @smogon/calc Pokemon */
 function buildPokemon(
   state: PokemonState,
-  overrides?: { item?: string; ability?: string; evs?: Record<string, number>; nature?: string }
+  overrides?: { item?: string; ability?: string; evs?: Partial<Record<string, number>>; ivs?: Partial<Record<string, number>>; nature?: string }
 ): Pokemon {
   const boosts: Record<string, number> = {};
   for (const [key, val] of Object.entries(state.boosts)) {
@@ -67,6 +75,7 @@ function buildPokemon(
     ability: overrides?.ability || state.ability || undefined,
     nature: overrides?.nature || undefined,
     evs: overrides?.evs || undefined,
+    ivs: overrides?.ivs || undefined,
     boosts,
     status: (state.status || undefined) as StatusName | undefined,
     curHP: state.hp,
@@ -83,11 +92,27 @@ export function calculateDamage(
   defender: PokemonState,
   moveName: string,
   field: FieldState,
-  attackerOverrides?: { item?: string; ability?: string; evs?: Record<string, number>; nature?: string },
+  attackerOverrides?: { item?: string; ability?: string; evs?: Partial<Record<string, number>>; ivs?: Partial<Record<string, number>>; nature?: string },
+  defenderOverrides?: DefenderOverrides,
 ): DamageResult {
   try {
     const atkMon = buildPokemon(attacker, attackerOverrides);
-    const defMon = buildPokemon(defender);
+    const defMon = buildPokemon(defender, defenderOverrides);
+
+    // Fix Bug 1: Opponent HP is reported as percentage (hpMax=100).
+    // @smogon/calc needs curHP relative to the Pokemon's actual max HP stat.
+    // If hpMax is 100 (percentage-based), convert to actual HP.
+    const realMaxHP = defMon.maxHP();
+    let defenderActualCurHP: number;
+    if (defender.hpMax === 100 && realMaxHP !== 100) {
+      // Opponent: hp is a percentage, convert to actual
+      defenderActualCurHP = Math.ceil(defender.hp * realMaxHP / 100);
+      defMon.originalCurHP = defenderActualCurHP;
+    } else {
+      // Player side: hp is already actual
+      defenderActualCurHP = defender.hp;
+    }
+
     const move = new Move(gen, moveName);
     const calcField = buildField(field, true);
 
@@ -102,8 +127,8 @@ export function calculateDamage(
     const maxDmg = Math.max(...rolls);
     const avgDmg = rolls.reduce((a, b) => a + b, 0) / rolls.length;
 
-    // KO chance = fraction of rolls that deal >= defender's current HP
-    const koRolls = rolls.filter(d => d >= defender.hp).length;
+    // Fix Bug 3: Compare rolls against actual current HP, not percentage
+    const koRolls = rolls.filter(d => d >= defenderActualCurHP).length;
     const koChance = rolls.length > 0 ? koRolls / rolls.length : 0;
 
     return { move: moveName, minDmg, maxDmg, avgDmg, koChance, rolls };

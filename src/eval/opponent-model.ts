@@ -89,6 +89,13 @@ export function revealAbility(model: OpponentModel, species: string, ability: st
   });
 }
 
+/** Get the most likely set for a species, or null if not modeled */
+export function getMostLikelySet(model: OpponentModel, species: string): RandbatsSet | null {
+  const mon = model.pokemon.find(p => p.species === species);
+  if (!mon || mon.possibleSets.length === 0) return null;
+  return mon.possibleSets.reduce((best, ws) => ws.probability > best.probability ? ws : best).set;
+}
+
 /**
  * Get the most likely moves the opponent could use.
  * Returns moves weighted by probability across all possible sets.
