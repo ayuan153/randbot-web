@@ -6,10 +6,10 @@
  * Opponent moves weighted by probability from opponent model.
  */
 
-import type { BattleSnapshot, ScoredOption, EvalConfig, OpponentModel, Action, PokemonState, MoveAction } from '../types';
+import type { BattleSnapshot, ScoredOption, EvalConfig, OpponentModel, Action, PokemonState, MoveAction, FieldState } from '../types';
 import { evaluate, tacticalBreakdown, tacticalScore, evaluateSwitchMatchup } from './scoring';
 import { calculateDamage, DefenderOverrides } from './damage';
-import { getLikelyMoves, getMostLikelySet } from './opponent-model';
+import { getLikelyMoves, getMostLikelySet, getRemainingSetProbabilities } from './opponent-model';
 
 const MINIMAX_WEIGHT = 0.7;
 const TACTICAL_WEIGHT = 0.3;
@@ -86,17 +86,13 @@ function evaluateMove(
   depth: number,
   opponentModel: OpponentModel,
 ): number {
-  // Build defender overrides from opponent model
-  const defOverrides = getDefenderOverrides(opponentModel, snapshot.opponent.active.species);
-
-  // Our move's damage to opponent
-  const ourDmg = calculateDamage(
+  // Our move's weighted damage to opponent across possible sets
+  const ourDmg = calculateWeightedDamage(
     snapshot.player.active,
     snapshot.opponent.active,
     action.id,
     snapshot.field,
-    undefined,
-    defOverrides,
+    opponentModel,
   );
 
   if (depth <= 0 || oppMoves.length === 0) {
@@ -212,6 +208,47 @@ function getDefenderOverrides(model: OpponentModel, species: string): DefenderOv
     ability: set.ability,
     item: set.item,
   };
+}
+
+/** Get probability-weighted defender overrides for damage calculation across multiple sets */
+function getWeightedDefenderSets(model: OpponentModel, species: string): Array<{ overrides: DefenderOverrides; probability: number }> {
+  const sets = getRemainingSetProbabilities(model, species, 5);
+  if (sets.length === 0) return [];
+  return sets.map(({ set, probability }) => ({
+    overrides: { evs: set.evs, ivs: set.ivs, nature: set.nature, ability: set.ability, item: set.item },
+    probability,
+  }));
+}
+
+/**
+ * Calculate probability-weighted damage across opponent's possible sets.
+ * Returns weighted average DamageResult values.
+ */
+function calculateWeightedDamage(
+  attacker: PokemonState,
+  defender: PokemonState,
+  moveName: string,
+  field: FieldState,
+  model: OpponentModel,
+  attackerOverrides?: { item?: string; ability?: string; evs?: Partial<Record<string, number>>; ivs?: Partial<Record<string, number>>; nature?: string },
+): { avgDmg: number; minDmg: number; maxDmg: number; koChance: number; realMaxHP: number } {
+  const defSets = getWeightedDefenderSets(model, defender.species);
+  if (defSets.length === 0) {
+    const result = calculateDamage(attacker, defender, moveName, field, attackerOverrides);
+    return { avgDmg: result.avgDmg, minDmg: result.minDmg, maxDmg: result.maxDmg, koChance: result.koChance, realMaxHP: result.realMaxHP };
+  }
+
+  let weightedAvg = 0, weightedMin = 0, weightedMax = 0, weightedKo = 0, maxHP = 0;
+  for (const { overrides, probability } of defSets) {
+    const result = calculateDamage(attacker, defender, moveName, field, attackerOverrides, overrides);
+    weightedAvg += result.avgDmg * probability;
+    weightedMin += result.minDmg * probability;
+    weightedMax += result.maxDmg * probability;
+    weightedKo += result.koChance * probability;
+    if (result.realMaxHP > maxHP) maxHP = result.realMaxHP;
+  }
+
+  return { avgDmg: weightedAvg, minDmg: weightedMin, maxDmg: weightedMax, koChance: weightedKo, realMaxHP: maxHP };
 }
 
 /** Apply damage to a side's active pokemon (returns new snapshot).

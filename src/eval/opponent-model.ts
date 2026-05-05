@@ -97,6 +97,23 @@ export function getMostLikelySet(model: OpponentModel, species: string): Randbat
 }
 
 /**
+ * Get remaining sets with normalized probabilities, capped at top N for performance.
+ * Returns sets sorted by probability descending.
+ */
+export function getRemainingSetProbabilities(model: OpponentModel, species: string, maxSets = 5): Array<{ set: RandbatsSet; probability: number }> {
+  const mon = model.pokemon.find(p => p.species === species);
+  if (!mon || mon.possibleSets.length === 0) return [];
+
+  const sorted = [...mon.possibleSets].sort((a, b) => b.probability - a.probability);
+  const top = sorted.slice(0, maxSets);
+
+  // Renormalize the top N probabilities to sum to 1
+  const total = top.reduce((sum, ws) => sum + ws.probability, 0);
+  if (total === 0) return top.map(ws => ({ set: ws.set, probability: 1 / top.length }));
+  return top.map(ws => ({ set: ws.set, probability: ws.probability / total }));
+}
+
+/**
  * Get the most likely moves the opponent could use.
  * Returns moves weighted by probability across all possible sets.
  */
