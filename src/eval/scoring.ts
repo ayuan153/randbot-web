@@ -6,6 +6,11 @@
 
 import type { BattleSnapshot, PokemonState, ScoreBreakdown, FieldState } from '../types';
 import { calculateDamage, damagePercent, DefenderOverrides } from './damage';
+import { Generations, TypeName } from '@pkmn/data';
+import { Dex } from '@pkmn/dex';
+
+const gens = new Generations(Dex);
+const gen9 = gens.get(9);
 
 // ─── Weights ────────────────────────────────────────────────────
 
@@ -171,4 +176,137 @@ function hazardMoveValue(snapshot: BattleSnapshot): number {
   // Hazards are more valuable if opponent has more pokemon to switch in
   const oppAlive = [snapshot.opponent.active, ...snapshot.opponent.bench].filter(p => p.hp > 0).length;
   return Math.min(oppAlive / 6, 1);
+}
+
+// ─── Switch Evaluation ──────────────────────────────────────────
+
+const W_SWITCH_DEFENSIVE = 0.35;
+const W_SWITCH_OFFENSIVE = 0.25;
+const W_SWITCH_SPEED = 0.15;
+const W_SWITCH_HP = 0.15;
+const W_SWITCH_ROLE = 0.10;
+
+/**
+ * Evaluate how good a switch-in is against the opponent's active Pokemon.
+ * Returns a value in [0, 1] where higher = better switch.
+ */
+export function evaluateSwitchMatchup(switchIn: PokemonState, opponent: PokemonState): number {
+  const defensive = defensiveMatchup(switchIn, opponent);
+  const offensive = offensiveMatchup(switchIn, opponent);
+  const speed = switchSpeedAdvantage(switchIn, opponent);
+  const hp = switchIn.hpMax > 0 ? switchIn.hp / switchIn.hpMax : 0;
+  const role = hp; // proxy: preserving a healthy mon = preserving its role
+
+  return (
+    W_SWITCH_DEFENSIVE * defensive +
+    W_SWITCH_OFFENSIVE * offensive +
+    W_SWITCH_SPEED * speed +
+    W_SWITCH_HP * hp +
+    W_SWITCH_ROLE * role
+  );
+}
+
+/**
+ * How well does the switch-in resist the opponent's attacks?
+ * Returns 0-1: 1 = resists everything, 0 = weak to everything.
+ */
+function defensiveMatchup(switchIn: PokemonState, opponent: PokemonState): number {
+  const switchInTypes = getSpeciesTypes(switchIn.species);
+  if (!switchInTypes.length) return 0.5;
+
+  // Get attacking types: use opponent's known moves, fall back to STAB types
+  const attackingTypes = getAttackingTypes(opponent);
+  if (!attackingTypes.length) return 0.5;
+
+  // Average effectiveness of opponent's attacks against our switch-in
+  let totalEff = 0;
+  for (const atkType of attackingTypes) {
+    totalEff += gen9.types.totalEffectiveness(atkType, switchInTypes);
+  }
+  const avgEff = totalEff / attackingTypes.length;
+
+  // Map effectiveness to 0-1 score: 0.25 (4x resist) → 1, 1 (neutral) → 0.5, 4 (4x weak) → 0
+  // Using log2: log2(0.25)=-2, log2(1)=0, log2(4)=2
+  // Score = 0.5 - log2(avgEff) * 0.25, clamped to [0, 1]
+  return Math.max(0, Math.min(1, 0.5 - Math.log2(avgEff) * 0.25));
+}
+
+/**
+ * Can the switch-in threaten the opponent offensively?
+ * Returns 0-1: 1 = super effective STAB, 0 = resisted.
+ */
+function offensiveMatchup(switchIn: PokemonState, opponent: PokemonState): number {
+  const opponentTypes = getSpeciesTypes(opponent.species);
+  if (!opponentTypes.length) return 0.5;
+
+  // Get our attacking types: known moves first, fall back to STAB
+  const attackingTypes = getAttackingTypes(switchIn);
+  if (!attackingTypes.length) return 0.5;
+
+  // Best effectiveness among our attacks against the opponent
+  let bestEff = 0;
+  for (const atkType of attackingTypes) {
+    const eff = gen9.types.totalEffectiveness(atkType, opponentTypes);
+    if (eff > bestEff) bestEff = eff;
+  }
+
+  // Map: 4 (4x SE) → 1, 2 (SE) → 0.75, 1 (neutral) → 0.5, 0.5 (resist) → 0.25, 0.25 → 0
+  return Math.max(0, Math.min(1, 0.5 + Math.log2(bestEff) * 0.25));
+}
+
+/**
+ * Is the switch-in faster than the opponent?
+ * Returns 0-1: 1 = definitely faster, 0 = definitely slower.
+ */
+function switchSpeedAdvantage(switchIn: PokemonState, opponent: PokemonState): number {
+  const switchSpeed = switchIn.stats?.['spe'];
+  const oppSpeed = opponent.stats?.['spe'];
+
+  // If we have actual stats, compare them
+  if (switchSpeed && oppSpeed) {
+    if (switchSpeed > oppSpeed) return 1;
+    if (switchSpeed < oppSpeed) return 0;
+    return 0.5;
+  }
+
+  // Fall back to boost comparison
+  const switchBoost = switchIn.boosts['spe'] || 0;
+  const oppBoost = opponent.boosts['spe'] || 0;
+  if (switchBoost > oppBoost) return 0.75;
+  if (switchBoost < oppBoost) return 0.25;
+  return 0.5;
+}
+
+/** Get a Pokemon's types from species data. Falls back to empty array. */
+function getSpeciesTypes(species: string): TypeName[] {
+  const speciesData = gen9.species.get(toID(species));
+  return (speciesData?.types as TypeName[] | undefined) ?? [];
+}
+
+/** Get the types of attacks a Pokemon is likely to use. */
+function getAttackingTypes(mon: PokemonState): TypeName[] {
+  const types: TypeName[] = [];
+
+  // Use known moves to determine attacking types
+  if (mon.moves.length > 0) {
+    for (const moveName of mon.moves) {
+      const moveData = gen9.moves.get(toID(moveName));
+      if (moveData && moveData.category !== 'Status') {
+        types.push(moveData.type as TypeName);
+      }
+    }
+  }
+
+  // If no damaging moves known, fall back to STAB types
+  if (types.length === 0) {
+    const speciesTypes = getSpeciesTypes(mon.species);
+    types.push(...speciesTypes);
+  }
+
+  return types;
+}
+
+/** Convert a name to an ID (lowercase, alphanumeric only). */
+function toID(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]/g, '');
 }

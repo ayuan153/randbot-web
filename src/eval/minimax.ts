@@ -7,7 +7,7 @@
  */
 
 import type { BattleSnapshot, ScoredOption, EvalConfig, OpponentModel, Action, PokemonState, MoveAction } from '../types';
-import { evaluate, tacticalBreakdown, tacticalScore } from './scoring';
+import { evaluate, tacticalBreakdown, tacticalScore, evaluateSwitchMatchup } from './scoring';
 import { calculateDamage, DefenderOverrides } from './damage';
 import { getLikelyMoves, getMostLikelySet } from './opponent-model';
 
@@ -185,14 +185,15 @@ function switchBreakdown(
   action: { type: 'switch'; species: string; slot: number },
 ) {
   const switchIn = snapshot.player.bench.find(p => p.species === action.species);
-  const hpFraction = switchIn ? (switchIn.hpMax > 0 ? switchIn.hp / switchIn.hpMax : 0) : 0;
+  const opponent = snapshot.opponent.active;
+  const switchInValue = switchIn ? evaluateSwitchMatchup(switchIn, opponent) : 0;
 
   return {
     damage: 0,
     koProbability: 0,
     statusValue: 0,
     hazardValue: 0,
-    switchInValue: hpFraction * 0.5, // healthier switch-ins are better
+    switchInValue,
     speedAdvantage: 0,
     positionalScore: 0,
   };

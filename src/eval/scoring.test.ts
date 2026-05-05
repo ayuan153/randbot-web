@@ -80,3 +80,70 @@ describe('evaluate', () => {
     expect(evaluate(withHazards)).toBeGreaterThan(evaluate(base));
   });
 });
+
+import { evaluateSwitchMatchup } from './scoring';
+import type { PokemonState } from '../types';
+
+function makeMon(overrides: Partial<PokemonState> = {}): PokemonState {
+  return {
+    species: 'Pikachu', level: 80, hp: 100, hpMax: 100,
+    status: null, boosts: {}, moves: [],
+    item: null, ability: null, teraType: null, terastallized: false,
+    ...overrides,
+  };
+}
+
+describe('evaluateSwitchMatchup', () => {
+  it('scores a resistant switch-in higher than a weak one', () => {
+    const opponent = makeMon({ species: 'Charizard', moves: ['Flamethrower'] });
+    // Water resists Fire
+    const goodSwitch = makeMon({ species: 'Blastoise', moves: ['Surf'] });
+    // Grass is weak to Fire
+    const badSwitch = makeMon({ species: 'Venusaur', moves: ['Giga Drain'] });
+
+    const goodScore = evaluateSwitchMatchup(goodSwitch, opponent);
+    const badScore = evaluateSwitchMatchup(badSwitch, opponent);
+
+    expect(goodScore).toBeGreaterThan(badScore);
+  });
+
+  it('scores a switch with offensive advantage higher', () => {
+    const opponent = makeMon({ species: 'Gyarados', moves: ['Waterfall'] });
+    // Electric is SE against Gyarados
+    const goodSwitch = makeMon({ species: 'Raichu', moves: ['Thunderbolt'] });
+    // Normal has no advantage
+    const neutralSwitch = makeMon({ species: 'Snorlax', moves: ['Body Slam'] });
+
+    const goodScore = evaluateSwitchMatchup(goodSwitch, opponent);
+    const neutralScore = evaluateSwitchMatchup(neutralSwitch, opponent);
+
+    expect(goodScore).toBeGreaterThan(neutralScore);
+  });
+
+  it('returns different scores (not flat 0.5) for varied matchups', () => {
+    const opponent = makeMon({ species: 'Garchomp', moves: ['Earthquake', 'Dragon Claw'] });
+    const switchA = makeMon({ species: 'Corviknight', moves: ['Brave Bird'] });
+    const switchB = makeMon({ species: 'Tyranitar', moves: ['Stone Edge'] });
+
+    const scoreA = evaluateSwitchMatchup(switchA, opponent);
+    const scoreB = evaluateSwitchMatchup(switchB, opponent);
+
+    // They should not be identical
+    expect(scoreA).not.toEqual(scoreB);
+    // Both should be in [0, 1]
+    expect(scoreA).toBeGreaterThanOrEqual(0);
+    expect(scoreA).toBeLessThanOrEqual(1);
+    expect(scoreB).toBeGreaterThanOrEqual(0);
+    expect(scoreB).toBeLessThanOrEqual(1);
+  });
+
+  it('factors in HP remaining', () => {
+    const opponent = makeMon({ species: 'Charizard', moves: ['Flamethrower'] });
+    const healthy = makeMon({ species: 'Blastoise', hp: 100, hpMax: 100, moves: ['Surf'] });
+    const injured = makeMon({ species: 'Blastoise', hp: 20, hpMax: 100, moves: ['Surf'] });
+
+    expect(evaluateSwitchMatchup(healthy, opponent)).toBeGreaterThan(
+      evaluateSwitchMatchup(injured, opponent)
+    );
+  });
+});
