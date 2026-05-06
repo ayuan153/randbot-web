@@ -1,87 +1,95 @@
-"""Download Gen 9 Random Battle replays from Pokemon Showdown replay API."""
+"""
+Download Gen 9 Random Battle replays from HuggingFace dataset.
 
+Dataset: HolidayOugi/pokemon-showdown-replays
+Files: [Gen 9] RANDOMBATTLE_part1.parquet through part8.parquet
+
+Usage:
+    python -m scraper.download_replays --count 100000
+    python -m scraper.download_replays --count 10000 --min-rating 1500
+"""
+
+import argparse
 import json
-import time
 from pathlib import Path
 
-import requests
+import pandas as pd
+from huggingface_hub import hf_hub_download
 from tqdm import tqdm
 
+REPO_ID = "HolidayOugi/pokemon-showdown-replays"
+PARQUET_FILES = [f"[Gen 9] RANDOMBATTLE_part{i}.parquet" for i in range(1, 9)]
 
-def scrape_replays(output_dir: str, target_count: int = 100000, min_rating: int = 1400):
-    """Download gen9randombattle replays with rating >= min_rating.
 
-    Resumable: skips replay IDs already present in output_dir.
-    """
+def download_from_hf(output_dir: str, target_count: int = 100000, min_rating: int = 1400) -> None:
+    """Download replays from HuggingFace parquet dataset."""
     output = Path(output_dir)
     output.mkdir(parents=True, exist_ok=True)
 
-    # Track existing files for resumability
-    existing = {f.stem for f in output.glob("*.json")}
-    downloaded = len(existing)
-    skipped = 0
+    existing = set(f.stem for f in output.glob("*.json"))
+    if len(existing) >= target_count:
+        print(f"Already have {len(existing)} replays (target: {target_count}). Done.")
+        return
 
-    if downloaded > 0:
-        print(f"Resuming: {downloaded} replays already downloaded")
+    print(f"Target: {target_count} replays, min rating: {min_rating}")
+    print(f"Existing: {len(existing)}, need: {target_count - len(existing)}")
+    collected = len(existing)
 
-    before = None  # pagination cursor
-    pbar = tqdm(total=target_count, initial=downloaded, desc="Downloading replays")
-
-    while downloaded < target_count:
-        url = "https://replay.pokemonshowdown.com/search.json?format=gen9randombattle"
-        if before:
-            url += f"&before={before}"
-
-        try:
-            resp = requests.get(url, timeout=30)
-            resp.raise_for_status()
-            results = resp.json()
-        except (requests.RequestException, json.JSONDecodeError) as e:
-            print(f"\nRequest error: {e}. Retrying in 5s...")
-            time.sleep(5)
-            continue
-
-        if not results:
-            print("\nNo more results from API.")
+    for filename in PARQUET_FILES:
+        if collected >= target_count:
             break
 
-        for replay in results:
-            if not (replay.get("rating") and replay["rating"] >= min_rating):
-                continue
+        print(f"\nDownloading {filename}...")
+        try:
+            local_path = hf_hub_download(
+                repo_id=REPO_ID,
+                filename=filename,
+                repo_type="dataset",
+            )
+        except Exception as e:
+            print(f"  Failed: {e}")
+            continue
 
-            replay_id = replay["id"]
+        print(f"  Reading parquet...")
+        df = pd.read_parquet(local_path)
+        print(f"  Total rows: {len(df)}")
+
+        # Filter by rating
+        if "rating" in df.columns:
+            mask = df["rating"].notna() & (df["rating"] >= min_rating)
+            filtered = df[mask]
+        else:
+            filtered = df
+        print(f"  After rating filter (>={min_rating}): {len(filtered)}")
+
+        for _, row in tqdm(filtered.iterrows(), total=len(filtered), desc="  Saving"):
+            replay_id = str(row.get("id", row.name))
             if replay_id in existing:
-                skipped += 1
                 continue
 
-            replay_url = f"https://replay.pokemonshowdown.com/{replay_id}.json"
-            try:
-                r = requests.get(replay_url, timeout=30)
-                if r.status_code == 200:
-                    data = r.json()
-                    filepath = output / f"{replay_id}.json"
-                    filepath.write_text(json.dumps(data))
-                    existing.add(replay_id)
-                    downloaded += 1
-                    pbar.update(1)
-            except (requests.RequestException, json.JSONDecodeError):
-                pass
+            replay_data = {
+                "id": replay_id,
+                "format": str(row.get("format", "gen9randombattle")),
+                "rating": float(row["rating"]) if "rating" in row and pd.notna(row["rating"]) else None,
+                "log": str(row.get("log", "")),
+                "uploadtime": int(row["uploadtime"]) if "uploadtime" in row and pd.notna(row["uploadtime"]) else None,
+            }
 
-            time.sleep(0.5)  # rate limit
+            filepath = output / f"{replay_id}.json"
+            filepath.write_text(json.dumps(replay_data))
+            existing.add(replay_id)
+            collected += 1
 
-        before = results[-1].get("uploadtime")
-        time.sleep(0.3)
+            if collected >= target_count:
+                break
 
-    pbar.close()
-    print(f"Done. {downloaded} replays in {output_dir} (skipped {skipped} duplicates)")
+    print(f"\nDone. Total replays: {collected}")
 
 
 if __name__ == "__main__":
-    import argparse
-
     parser = argparse.ArgumentParser(description="Download Pokemon Showdown replays")
-    parser.add_argument("--output", default="data/replays")
-    parser.add_argument("--count", type=int, default=100000)
-    parser.add_argument("--min-rating", type=int, default=1400)
+    parser.add_argument("--output", default="data/replays", help="Output directory")
+    parser.add_argument("--count", type=int, default=100000, help="Target replay count")
+    parser.add_argument("--min-rating", type=int, default=1400, help="Minimum player rating")
     args = parser.parse_args()
-    scrape_replays(args.output, args.count, args.min_rating)
+    download_from_hf(args.output, args.count, args.min_rating)
