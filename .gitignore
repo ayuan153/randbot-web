@@ -5,3 +5,4 @@ dist/
 .vite/
 .builder-mcp/
 packageInfo
+models/*.onnx

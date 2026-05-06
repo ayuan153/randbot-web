@@ -1,7 +1,7 @@
 /**
  * Post-build script: copies manifest.json, offscreen HTML, and data to dist/.
  */
-import { readFileSync, writeFileSync, copyFileSync, existsSync, mkdirSync } from 'fs';
+import { readFileSync, writeFileSync, copyFileSync, existsSync, mkdirSync, readdirSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -19,6 +19,7 @@ manifest.web_accessible_resources[0].resources = [
   'inject/hook.js',
   'eval/eval-worker.js',
   'data/gen9randombattle.json',
+  'models/*',
 ];
 
 // Write manifest to dist
@@ -39,3 +40,18 @@ if (existsSync(setsFile)) {
 }
 
 console.log('✓ manifest.json, offscreen HTML, and data copied to dist/');
+
+// Copy ONNX models (graceful if none exist yet)
+const modelsDir = resolve(root, 'models');
+const distModelsDir = resolve(distDir, 'models');
+if (existsSync(modelsDir)) {
+  if (!existsSync(distModelsDir)) mkdirSync(distModelsDir, { recursive: true });
+  for (const file of readdirSync(modelsDir)) {
+    if (file.endsWith('.onnx')) {
+      copyFileSync(resolve(modelsDir, file), resolve(distModelsDir, file));
+    }
+  }
+  console.log('✓ ONNX models copied to dist/models/');
+} else {
+  console.log('ℹ No models/ directory found, skipping model copy');
+}
