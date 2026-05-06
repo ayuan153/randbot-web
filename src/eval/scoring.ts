@@ -8,6 +8,7 @@ import type { BattleSnapshot, PokemonState, ScoreBreakdown, FieldState } from '.
 import { calculateDamage, damagePercent, DefenderOverrides } from './damage';
 import { Generations, TypeName } from '@pkmn/data';
 import { Dex } from '@pkmn/dex';
+import { toID } from '../util/id';
 
 const gens = new Generations(Dex);
 const gen9 = gens.get(9);
@@ -135,20 +136,6 @@ export function tacticalBreakdown(
   };
 }
 
-/**
- * Compute tactical score from breakdown.
- */
-export function tacticalScore(breakdown: ScoreBreakdown): number {
-  return (
-    breakdown.koProbability * 0.35 +
-    breakdown.damage * 0.25 +
-    breakdown.statusValue * 0.15 +
-    breakdown.hazardValue * 0.10 +
-    breakdown.speedAdvantage * 0.05 +
-    breakdown.positionalScore * 0.10
-  );
-}
-
 // ─── Helpers ────────────────────────────────────────────────────
 
 function speedAdvantage(attacker: PokemonState, defender: PokemonState): number {
@@ -171,11 +158,11 @@ const HAZARD_MOVES = new Set([
 ]);
 
 function isStatusMove(move: string): boolean {
-  return STATUS_MOVES.has(move.toLowerCase().replace(/[^a-z]/g, ''));
+  return STATUS_MOVES.has(toID(move));
 }
 
 function isHazardMove(move: string): boolean {
-  return HAZARD_MOVES.has(move.toLowerCase().replace(/[^a-z]/g, ''));
+  return HAZARD_MOVES.has(toID(move));
 }
 
 function hazardMoveValue(snapshot: BattleSnapshot): number {
@@ -313,9 +300,4 @@ function getAttackingTypes(mon: PokemonState): TypeName[] {
   }
 
   return types;
-}
-
-/** Convert a name to an ID (lowercase, alphanumeric only). */
-function toID(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]/g, '');
 }

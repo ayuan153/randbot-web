@@ -10,6 +10,7 @@
  */
 
 import type { RandbatsSet } from '../types';
+import { toID } from '../util/id';
 
 interface RawRole {
   abilities: string[];
@@ -104,9 +105,9 @@ export function getLevelForSpecies(species: string): number {
 /** Find the key in the DB matching a species name (case-insensitive, stripped) */
 function findSpeciesKey(species: string): string | undefined {
   if (!db) return undefined;
-  const normalized = species.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const normalized = toID(species);
   return Object.keys(db).find(
-    k => k.toLowerCase().replace(/[^a-z0-9]/g, '') === normalized
+    k => toID(k) === normalized
   );
 }
 

@@ -6,6 +6,7 @@
 
 import type { OpponentModel, OpponentPokemonModel, WeightedSet, RandbatsSet } from '../types';
 import { getSetsForSpecies } from '../state/sets-db';
+import { toID } from '../util/id';
 
 /** Create a fresh opponent model for a battle */
 export function createOpponentModel(teamSize: number): OpponentModel {
@@ -40,9 +41,9 @@ export function revealMove(model: OpponentModel, species: string, move: string):
   return updatePokemon(model, species, (mon) => {
     if (mon.revealedMoves.includes(move)) return mon;
 
-    const normalizedMove = move.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const normalizedMove = toID(move);
     const filtered = mon.possibleSets.filter(ws =>
-      ws.set.moves.some(m => m.toLowerCase().replace(/[^a-z0-9]/g, '') === normalizedMove)
+      ws.set.moves.some(m => toID(m) === normalizedMove)
     );
 
     return {
@@ -58,9 +59,9 @@ export function revealItem(model: OpponentModel, species: string, item: string):
   return updatePokemon(model, species, (mon) => {
     if (mon.revealedItem === item) return mon;
 
-    const normalizedItem = item.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const normalizedItem = toID(item);
     const filtered = mon.possibleSets.filter(ws =>
-      ws.set.item.toLowerCase().replace(/[^a-z0-9]/g, '') === normalizedItem
+      toID(ws.set.item) === normalizedItem
     );
 
     return {
@@ -76,9 +77,9 @@ export function revealAbility(model: OpponentModel, species: string, ability: st
   return updatePokemon(model, species, (mon) => {
     if (mon.revealedAbility === ability) return mon;
 
-    const normalizedAbility = ability.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const normalizedAbility = toID(ability);
     const filtered = mon.possibleSets.filter(ws =>
-      ws.set.ability.toLowerCase().replace(/[^a-z0-9]/g, '') === normalizedAbility
+      toID(ws.set.ability) === normalizedAbility
     );
 
     return {

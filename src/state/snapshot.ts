@@ -7,6 +7,7 @@
 
 import type { BattleSnapshot, PokemonState, SideFieldState, Action } from '../types';
 import { getSetsForSpecies } from './sets-db';
+import { toID } from '../util/id';
 
 /** Parse PS condition string like "267/300 brn" or "0 fnt" */
 export function parseCondition(cond: string): { hp: number; hpMax: number; status: string | null } {
@@ -129,18 +130,16 @@ function inferSetData(species: string, moves: string[], ability: string | null, 
   const sets = getSetsForSpecies(species);
   if (sets.length === 0) return {};
 
-  const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
-
   // Score each set by how many known attributes match
   let bestSet = sets[0];
   let bestScore = -1;
 
   for (const set of sets) {
     let score = 0;
-    if (ability && normalize(set.ability) === normalize(ability)) score += 2;
-    if (item && normalize(set.item) === normalize(item)) score += 2;
+    if (ability && toID(set.ability) === toID(ability)) score += 2;
+    if (item && toID(set.item) === toID(item)) score += 2;
     for (const move of moves) {
-      if (set.moves.some(m => normalize(m) === normalize(move))) score += 1;
+      if (set.moves.some(m => toID(m) === toID(move))) score += 1;
     }
     if (score > bestScore) {
       bestScore = score;
