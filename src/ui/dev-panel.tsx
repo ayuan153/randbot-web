@@ -128,7 +128,7 @@ function OpponentMonRow({ mon }: { mon: OpponentPokemonModel }) {
       )}
       {topSet && (
         <div class="dev-row dev-indent">
-          Top set: {topSet.set.nature} | {formatEvs(topSet.set.evs)} ({Math.round(topSet.probability * 100)}%)
+          Top set: {topSet.set.ability}{topSet.set.item ? ` / ${topSet.set.item}` : ''} ({Math.round(topSet.probability * 100)}%)
         </div>
       )}
     </div>
@@ -172,13 +172,6 @@ function FieldSection({ field }: { field: BattleSnapshot['field'] }) {
       <div class="dev-row"><span class="dev-label">Opp side:</span> {formatSideField(field.opponentSide)}</div>
     </div>
   );
-}
-
-function formatEvs(evs: Record<string, number>): string {
-  return Object.entries(evs)
-    .filter(([, v]) => v > 0)
-    .map(([k, v]) => `${v} ${k}`)
-    .join(' / ');
 }
 
 function formatStats(stats: Record<string, number>): string {

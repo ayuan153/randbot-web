@@ -61,14 +61,14 @@ export function getSetsForSpecies(species: string): RandbatsSet[] {
   const data = db[key];
   const sets: RandbatsSet[] = [];
 
-  for (const [, role] of Object.entries(data.roles)) {
+  for (const [roleName, role] of Object.entries(data.roles)) {
     sets.push({
       ability: role.abilities[0] || data.abilities[0] || '',
       item: role.items[0] || data.items[0] || '',
       moves: role.moves,
       evs: data.evs || {},
       ivs: {},
-      nature: inferNature(data.evs || {}),
+      nature: inferNature(data.evs || {}, roleName),
       teraType: role.teraTypes?.[0],
     });
   }
@@ -111,19 +111,33 @@ function findSpeciesKey(species: string): string | undefined {
   );
 }
 
-/** Infer nature from EV spread (heuristic) */
-function inferNature(evs: Record<string, number>): string {
+/** Infer nature from EV spread or role name */
+function inferNature(evs: Record<string, number>, roleName?: string): string {
+  // Try EVs first
   const maxStat = Object.entries(evs).reduce(
     (best, [stat, val]) => val > best[1] ? [stat, val] as [string, number] : best,
     ['', 0] as [string, number]
   );
 
-  switch (maxStat[0]) {
-    case 'atk': return 'Adamant';
-    case 'spa': return 'Modest';
-    case 'spe': return 'Jolly';
-    case 'hp': case 'def': return 'Bold';
-    case 'spd': return 'Calm';
-    default: return 'Serious';
+  if (maxStat[1] > 0) {
+    switch (maxStat[0]) {
+      case 'atk': return 'Adamant';
+      case 'spa': return 'Modest';
+      case 'spe': return 'Jolly';
+      case 'hp': case 'def': return 'Bold';
+      case 'spd': return 'Calm';
+    }
   }
+
+  // Fall back to role name heuristic
+  if (roleName) {
+    const role = roleName.toLowerCase();
+    if (role.includes('bulky') || role.includes('wall') || role.includes('stall')) return 'Bold';
+    if (role.includes('special')) return 'Modest';
+    if (role.includes('fast')) return 'Jolly';
+    // Physical sweeper/setup/wallbreaker
+    if (role.includes('sweeper') || role.includes('setup') || role.includes('wallbreaker')) return 'Adamant';
+  }
+
+  return 'Serious';
 }
