@@ -11,10 +11,16 @@ A phased roadmap to evolve randbats-bot from a heuristic depth-2 searcher (~1000
 | Search | Depth-2 expectiminimax with alpha-beta pruning |
 | Damage | `@smogon/calc` (JS, 16-roll average per calc) |
 | Opponent model | Bayesian set narrowing — eliminates impossible sets as moves/items/abilities are revealed |
-| Evaluation | Hand-tuned heuristic (HP%, hazards, status, boosts, speed tiers, role value) |
+| Evaluation | ONNX neural net (MLP 206→256→128→64→1) + heuristic fallback |
 | Extension | Chrome extension with dev mode, turn logging, Shadow DOM overlay |
 | Performance | ~50-200 positions/second |
 | **Estimated strength** | **~1000-1100 Elo** |
+
+### Latest (2026-05-06)
+
+- Model v2 trained on 500K replays (23.5M samples), 64.9% accuracy
+- Wider model (512→256→128) only +0.7% over narrow — features are the bottleneck, not capacity
+- Adding features A-H: speed, type matchup, turns-to-KO, setup, stall, futility (~40 new features)
 
 ### Key Decision
 
@@ -288,3 +294,5 @@ All timelines assume single developer, part-time (~20 hrs/week). Phases are sequ
 | 2026-05-05 | `@pkmn/engine` only supports Gen 1. Pivoting to Phase 2 (learned eval) as priority. | Cannot use for Gen 9 Random Battles. Search improvements alone (without faster sim) give diminishing returns at depth 2. |
 | 2026-05-05 | Using HuggingFace dataset (31.7M replays) as primary data source. | Avoids rate limiting from replay.pokemonshowdown.com, parquet format is efficient for filtering. |
 | 2026-05-05 | Feature vector design: ~206 fixed-size features. | Compact enough for fast inference (<10ms), rich enough to capture key battle dynamics. Expandable if accuracy plateaus. |
+| 2026-05-06 | Wider model (512→256→128) only +0.7% over narrow. Features are the bottleneck, not capacity. | 64.9% vs 64.2% — diminishing returns from model size. Investment should go into feature engineering. |
+| 2026-05-06 | Adding ~40 new features focused on speed, matchup dynamics, setup/stall patterns. | Speed awareness, type matchup depth, turns-to-KO, setup detection, stall detection, futility signals. |

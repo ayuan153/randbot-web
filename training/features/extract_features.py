@@ -1,4 +1,21 @@
-"""Extract 206-feature vectors from replay protocol logs for training."""
+"""Extract 245-feature vectors from replay protocol logs for training.
+
+Feature layout (245 total):
+  [0-155]   Per-Pokemon (12 mons x 13 features)
+  [156-163] Matchup (8)
+  [164-175] Team-level (12)
+  [176-193] Field (18)
+  [194-205] Tempo (12)
+  --- NEW (appended at 206+) ---
+  [206-211] A. Speed-related (6)
+  [212-216] B. Type matchup (5)
+  [217-219] C. Turns-to-KO (3)
+  [220-223] D. Team composition (4)
+  [224-226] E. Momentum (3)
+  [227-233] F. Setup threat (7)
+  [234-241] G. Stall/wall (8)
+  [242-244] H. Futility (3)
+"""
 
 import json
 from pathlib import Path
@@ -8,6 +25,24 @@ from tqdm import tqdm
 
 from .battle_state import BattleState, update_state
 from .type_chart import type_effectiveness
+from .base_stats import (
+    get_types, get_move_type_power, estimate_speed, MOVE_BASE_POWERS,
+)
+
+# Move category sets
+PRIORITY_MOVES = {"Mach Punch", "Aqua Jet", "Bullet Punch", "Extreme Speed", "Ice Shard",
+                  "Shadow Sneak", "Sucker Punch", "Quick Attack", "Accelerock", "Grassy Glide", "Jet Punch"}
+SETUP_MOVES = {"Calm Mind", "Swords Dance", "Dragon Dance", "Nasty Plot", "Quiver Dance",
+               "Iron Defense", "Bulk Up", "Shell Smash", "Shift Gear", "Coil", "Agility",
+               "Rock Polish", "Autotomize", "Belly Drum", "Tail Glow", "Growth", "Work Up"}
+RECOVERY_MOVES = {"Recover", "Roost", "Synthesis", "Moonlight", "Morning Sun",
+                  "Soft-Boiled", "Slack Off", "Shore Up", "Strength Sap"}
+PHAZE_MOVES = {"Roar", "Whirlwind", "Dragon Tail", "Circle Throw"}
+HAZE_MOVES = {"Haze", "Clear Smog"}
+PROTECT_MOVES = {"Protect", "Detect", "Baneful Bunker", "King's Shield", "Spiky Shield"}
+TOXIC_MOVES = {"Toxic"}
+SUBSTITUTE_MOVES = {"Substitute"}
+PHYSICAL_MOVES_THRESHOLD = 80  # base power threshold for "physical attacker" heuristic
 
 # Status encoding: maps status string to normalized float
 STATUS_MAP = {"": 0.0, "brn": 1/6, "par": 2/6, "slp": 3/6, "frz": 4/6, "psn": 5/6, "tox": 1.0}
@@ -162,8 +197,253 @@ def _tempo_features(state: BattleState, our_side_idx: int) -> list[float]:
     ]
 
 
+def _effectiveness_to_scale(mult: float) -> float:
+    """Map raw effectiveness multiplier to normalized scale."""
+    if mult == 0: return 0.0
+    if mult <= 0.25: return 0.25
+    if mult <= 0.5: return 0.5
+    if mult <= 1.0: return 0.75
+    if mult <= 2.0: return 1.0
+    return 1.25
+
+
+def _best_stab_eff(mon_types: list[str], moves_known: list[str], def_types: list[str]) -> float:
+    """Best STAB effectiveness from known moves or types against defender."""
+    best = 0.0
+    # Check known moves that match STAB
+    for move in moves_known:
+        mtype, bp = get_move_type_power(move)
+        if bp > 0 and mtype in mon_types:
+            eff = type_effectiveness(mtype, def_types)
+            best = max(best, eff)
+    # Also check raw STAB types
+    for t in mon_types:
+        eff = type_effectiveness(t, def_types)
+        best = max(best, eff)
+    return best
+
+
+def _estimate_best_damage_pct(mon_types: list[str], moves_known: list[str], def_types: list[str]) -> float:
+    """Rough damage proxy: base_power * effectiveness * stab / 200, capped at 1.0."""
+    best = 0.0
+    for move in moves_known:
+        mtype, bp = get_move_type_power(move)
+        if bp == 0:
+            continue
+        eff = type_effectiveness(mtype, def_types)
+        stab = 1.5 if mtype in mon_types else 1.0
+        dmg = bp * eff * stab / 200.0
+        best = max(best, dmg)
+    # Fallback: assume 80bp STAB move
+    if not moves_known:
+        for t in mon_types:
+            eff = type_effectiveness(t, def_types)
+            best = max(best, 80 * eff * 1.5 / 200.0)
+    return min(best, 1.0)
+
+
+def _speed_features(our_side, their_side) -> list[float]:
+    """A. Speed-related (6 features)."""
+    our_mon = our_side.active
+    their_mon = their_side.active
+    my_speed = estimate_speed(our_mon.species) if our_mon.species else 80.0
+    opp_speed = estimate_speed(their_mon.species) if their_mon.species else 80.0
+
+    # Apply paralysis
+    if their_mon.status == "par":
+        opp_speed *= 0.5
+
+    total = my_speed + opp_speed
+    speed_ratio = my_speed / total if total > 0 else 0.5
+
+    priority = 1.0 if any(m in PRIORITY_MOVES for m in our_mon.moves_known) else 0.0
+
+    # Scarf possible: check if opponent has item and could be scarfed
+    # We approximate: if opponent still has item and outspeeds expectations, scarf is possible
+    scarf_possible = 1.0 if their_mon.has_item else 0.0
+
+    paralysis = 1.0 if their_mon.status == "par" else 0.0
+
+    return [
+        min(my_speed / 500.0, 1.0),
+        min(opp_speed / 500.0, 1.0),
+        speed_ratio,
+        priority,
+        scarf_possible,
+        paralysis,
+    ]
+
+
+def _type_matchup_features(our_side, their_side) -> list[float]:
+    """B. Type matchup (5 features)."""
+    our_mon = our_side.active
+    their_mon = their_side.active
+    my_types = get_types(our_mon.species) if our_mon.species else ["Normal"]
+    opp_types = get_types(their_mon.species) if their_mon.species else ["Normal"]
+
+    best_stab = _effectiveness_to_scale(_best_stab_eff(my_types, our_mon.moves_known, opp_types))
+    their_best_stab = _effectiveness_to_scale(_best_stab_eff(opp_types, their_mon.moves_known, my_types))
+
+    # Primary STAB type of opponent
+    opp_primary_stab = opp_types[0] if opp_types else "Normal"
+
+    resists = 0
+    weak = 0
+    for mon in our_side.pokemon:
+        if not mon.is_alive or not mon.species:
+            continue
+        mt = get_types(mon.species)
+        eff = type_effectiveness(opp_primary_stab, mt)
+        if eff < 1.0:
+            resists += 1
+        elif eff > 1.0:
+            weak += 1
+
+    # Immunity check for active
+    immune = 1.0 if type_effectiveness(opp_primary_stab, my_types) == 0.0 else 0.0
+
+    return [best_stab, their_best_stab, resists / 6.0, weak / 6.0, immune]
+
+
+def _ttko_features(our_side, their_side) -> list[float]:
+    """C. Turns-to-KO (3 features)."""
+    our_mon = our_side.active
+    their_mon = their_side.active
+    my_types = get_types(our_mon.species) if our_mon.species else ["Normal"]
+    opp_types = get_types(their_mon.species) if their_mon.species else ["Normal"]
+
+    my_dmg = _estimate_best_damage_pct(my_types, our_mon.moves_known, opp_types)
+    their_dmg = _estimate_best_damage_pct(opp_types, their_mon.moves_known, my_types)
+
+    my_ttko = min(1.0 / my_dmg, 5.0) / 5.0 if my_dmg > 0 else 1.0
+    their_ttko = min(1.0 / their_dmg, 5.0) / 5.0 if their_dmg > 0 else 1.0
+
+    ko_diff = np.clip((their_ttko - my_ttko) / 1.0, -1, 1)  # already normalized
+
+    return [my_ttko, their_ttko, ko_diff]
+
+
+def _team_comp_features(our_side, their_side) -> list[float]:
+    """D. Team composition (4 features)."""
+    phys_attackers = 0
+    spec_attackers = 0
+    walls = 0
+
+    for mon in our_side.pokemon:
+        if not mon.is_alive or not mon.species:
+            continue
+        # Physical: has physical moves with decent BP
+        has_phys = any(get_move_type_power(m)[1] >= 70 and m not in SETUP_MOVES | RECOVERY_MOVES
+                       for m in mon.moves_known)
+        has_spec = any(m in ("Thunderbolt", "Ice Beam", "Flamethrower", "Hydro Pump",
+                             "Fire Blast", "Moonblast", "Shadow Ball", "Psychic",
+                             "Energy Ball", "Dark Pulse", "Focus Blast", "Draco Meteor",
+                             "Leaf Storm", "Surf", "Scald", "Thunder", "Blizzard",
+                             "Flash Cannon", "Aura Sphere", "Hurricane", "Psyshock")
+                       for m in mon.moves_known)
+        has_recovery = any(m in RECOVERY_MOVES for m in mon.moves_known)
+
+        if has_phys:
+            phys_attackers += 1
+        if has_spec:
+            spec_attackers += 1
+        if has_recovery:
+            walls += 1
+
+    # Unrevealed opponents
+    opp_unrevealed = sum(1 for m in their_side.pokemon if not m.species)
+
+    return [phys_attackers / 6.0, spec_attackers / 6.0, opp_unrevealed / 6.0, walls / 6.0]
+
+
+def _momentum_features(state: BattleState, our_side, their_side, our_side_idx: int) -> list[float]:
+    """E. Momentum (3 features)."""
+    # Consecutive KOs: approximate from faint count difference over recent turns
+    our_fainted = sum(1 for m in our_side.pokemon if not m.is_alive and m.species)
+    their_fainted = sum(1 for m in their_side.pokemon if not m.is_alive and m.species)
+    consec_kos = min(max(their_fainted - our_fainted, 0), 3) / 3.0
+
+    # Last move was switch: approximate from active mon having 0 boosts and full HP
+    last_switch = 0.0  # Can't reliably determine from state alone, default 0
+
+    # Entry hazard layers on opponent's side
+    opp_hazards = their_side.hazards
+    hazard_layers = (opp_hazards.get("stealthrock", 0) +
+                     opp_hazards.get("spikes", 0) +
+                     opp_hazards.get("toxicspikes", 0))
+    return [consec_kos, last_switch, min(hazard_layers, 6) / 6.0]
+
+
+def _setup_features(our_side, their_side) -> list[float]:
+    """F. Setup threat (7 features)."""
+    their_mon = their_side.active
+    our_mon = our_side.active
+
+    opp_has_setup = 1.0 if any(m in SETUP_MOVES for m in their_mon.moves_known) else 0.0
+
+    opp_boost_total = sum(max(0, v) for v in their_mon.boosts.values()) / 12.0
+    my_boost_total = sum(max(0, v) for v in our_mon.boosts.values()) / 12.0
+
+    # Approximate setup turns from boost total
+    opp_setup_turns = min(sum(max(0, v) for v in their_mon.boosts.values()), 3) / 3.0
+
+    can_phaze = 1.0 if any(m in PHAZE_MOVES for m in our_mon.moves_known) else 0.0
+    can_haze = 1.0 if any(m in HAZE_MOVES for m in our_mon.moves_known) else 0.0
+
+    # Unaware on team
+    unaware = 1.0 if any(m.ability == "Unaware" for m in our_side.pokemon if m.is_alive) else 0.0
+
+    return [opp_has_setup, opp_boost_total, my_boost_total, opp_setup_turns,
+            can_phaze, can_haze, unaware]
+
+
+def _stall_features(our_side, their_side) -> list[float]:
+    """G. Stall/wall (8 features)."""
+    their_mon = their_side.active
+    our_mon = our_side.active
+    my_types = get_types(our_mon.species) if our_mon.species else ["Normal"]
+    opp_types = get_types(their_mon.species) if their_mon.species else ["Normal"]
+
+    opp_recovery = 1.0 if any(m in RECOVERY_MOVES for m in their_mon.moves_known) else 0.0
+    opp_toxic = 1.0 if any(m in TOXIC_MOVES for m in their_mon.moves_known) else 0.0
+    opp_sub = 1.0 if any(m in SUBSTITUTE_MOVES for m in their_mon.moves_known) else 0.0
+    opp_protect = 1.0 if any(m in PROTECT_MOVES for m in their_mon.moves_known) else 0.0
+
+    my_best_dmg = _estimate_best_damage_pct(my_types, our_mon.moves_known, opp_types)
+    dmg_vs_recovery = np.clip(my_best_dmg - 0.25, -1.0, 1.0)
+
+    toxic_on_me = 1.0 if our_mon.status == "tox" else 0.0
+    # Approximate toxic turns from HP lost (rough heuristic)
+    toxic_turns = 0.0
+    if our_mon.status == "tox":
+        hp_lost = 1.0 - our_mon.hp_fraction()
+        toxic_turns = min(hp_lost * 8, 8) / 8.0  # rough estimate
+
+    return [opp_recovery, opp_toxic, opp_sub, opp_protect,
+            my_best_dmg, dmg_vs_recovery, toxic_on_me, toxic_turns]
+
+
+def _futility_features(our_side, their_side) -> list[float]:
+    """H. Futility (3 features)."""
+    our_mon = our_side.active
+    their_mon = their_side.active
+    my_types = get_types(our_mon.species) if our_mon.species else ["Normal"]
+    opp_types = get_types(their_mon.species) if their_mon.species else ["Normal"]
+
+    my_best_dmg = _estimate_best_damage_pct(my_types, our_mon.moves_known, opp_types)
+    their_best_dmg = _estimate_best_damage_pct(opp_types, their_mon.moves_known, my_types)
+
+    walled = 1.0 if my_best_dmg < 0.20 else 0.0
+    they_walled = 1.0 if their_best_dmg < 0.20 else 0.0
+
+    opp_recovery = any(m in RECOVERY_MOVES for m in their_mon.moves_known)
+    futility = 1.0 if walled == 1.0 and opp_recovery else 0.0
+
+    return [walled, they_walled, futility]
+
+
 def extract_features(state: BattleState, perspective: int) -> np.ndarray:
-    """Extract 206-feature vector from battle state for given perspective (0=p1, 1=p2).
+    """Extract 245-feature vector from battle state for given perspective (0=p1, 1=p2).
 
     Feature layout:
     - Per-Pokemon x12 (13 each) = 156
@@ -171,7 +451,15 @@ def extract_features(state: BattleState, perspective: int) -> np.ndarray:
     - Team-level = 12
     - Field = 18
     - Tempo = 12
-    Total = 206
+    - A. Speed = 6
+    - B. Type matchup = 5
+    - C. Turns-to-KO = 3
+    - D. Team composition = 4
+    - E. Momentum = 3
+    - F. Setup threat = 7
+    - G. Stall/wall = 8
+    - H. Futility = 3
+    Total = 245
     """
     our_side = state.sides[perspective]
     their_side = state.sides[1 - perspective]
@@ -198,8 +486,30 @@ def extract_features(state: BattleState, perspective: int) -> np.ndarray:
     # Tempo (12)
     features.extend(_tempo_features(state, perspective))
 
-    assert len(features) == 206, f"Expected 206 features, got {len(features)}"
+    # --- NEW FEATURES (appended at index 206+) ---
+    # A. Speed (6)
+    features.extend(_speed_features(our_side, their_side))
+    # B. Type matchup (5)
+    features.extend(_type_matchup_features(our_side, their_side))
+    # C. Turns-to-KO (3)
+    features.extend(_ttko_features(our_side, their_side))
+    # D. Team composition (4)
+    features.extend(_team_comp_features(our_side, their_side))
+    # E. Momentum (3)
+    features.extend(_momentum_features(state, our_side, their_side, perspective))
+    # F. Setup threat (7)
+    features.extend(_setup_features(our_side, their_side))
+    # G. Stall/wall (8)
+    features.extend(_stall_features(our_side, their_side))
+    # H. Futility (3)
+    features.extend(_futility_features(our_side, their_side))
+
+    assert len(features) == 245, f"Expected 245 features, got {len(features)}"
     return np.array(features, dtype=np.float32)
+
+
+# Alias for backward compatibility
+extract_features_from_state = extract_features
 
 
 def process_replay(replay_data: dict) -> list[tuple[np.ndarray, float]]:
