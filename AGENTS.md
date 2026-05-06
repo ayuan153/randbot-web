@@ -90,3 +90,13 @@ docs: update README with scoring formula
 - `src/worker/` is the service worker (no DOM, no `new Worker()`)
 - `src/eval/` runs inside a Web Worker (no DOM, no Chrome APIs)
 - Communication between layers is message-passing only — keep payloads serializable
+
+## Intelligence Work — Progress Tracking
+
+After each substantive change to the engine, search, or training pipeline:
+
+1. Update `docs/intelligence/implementation-plan.md` with current progress, decisions made, and any deviations from the original plan
+2. Keep a "Current State" section at the top reflecting what's actually built vs planned
+3. Update "Next Steps" to reflect what should happen next
+
+This ensures handoffs between agents/sessions are smooth. The docs should always answer: "Where are we? What changed? What's next?"
