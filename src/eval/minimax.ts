@@ -6,7 +6,7 @@
  * Opponent moves weighted by probability from opponent model.
  */
 
-import type { BattleSnapshot, ScoredOption, EvalConfig, OpponentModel, Action, PokemonState, MoveAction, FieldState } from '../types';
+import type { BattleSnapshot, ScoredOption, EvalConfig, OpponentModel, Action, PokemonState, MoveAction, FieldState, RandbatsSet } from '../types';
 import { evaluate, tacticalBreakdown, evaluateSwitchMatchup } from './scoring';
 import { calculateDamage, DefenderOverrides } from './damage';
 import { getLikelyMoves, getMostLikelySet, getRemainingSetProbabilities } from './opponent-model';
@@ -195,10 +195,8 @@ function switchBreakdown(
 
 // ─── Helpers ────────────────────────────────────────────────────
 
-/** Build DefenderOverrides from the opponent model's most likely set */
-function getDefenderOverrides(model: OpponentModel, species: string): DefenderOverrides | undefined {
-  const set = getMostLikelySet(model, species);
-  if (!set) return undefined;
+/** Convert a RandbatsSet to DefenderOverrides */
+function setToOverrides(set: RandbatsSet): DefenderOverrides {
   return {
     evs: set.evs,
     ivs: set.ivs,
@@ -208,12 +206,19 @@ function getDefenderOverrides(model: OpponentModel, species: string): DefenderOv
   };
 }
 
+/** Build DefenderOverrides from the opponent model's most likely set */
+function getDefenderOverrides(model: OpponentModel, species: string): DefenderOverrides | undefined {
+  const set = getMostLikelySet(model, species);
+  if (!set) return undefined;
+  return setToOverrides(set);
+}
+
 /** Get probability-weighted defender overrides for damage calculation across multiple sets */
 function getWeightedDefenderSets(model: OpponentModel, species: string): Array<{ overrides: DefenderOverrides; probability: number }> {
   const sets = getRemainingSetProbabilities(model, species, 5);
   if (sets.length === 0) return [];
   return sets.map(({ set, probability }) => ({
-    overrides: { evs: set.evs, ivs: set.ivs, nature: set.nature, ability: set.ability, item: set.item },
+    overrides: setToOverrides(set),
     probability,
   }));
 }
@@ -265,11 +270,6 @@ function applyDamage(snapshot: BattleSnapshot, side: 'player' | 'opponent', dama
     return { ...snapshot, player: { ...snapshot.player, active: newActive } };
   }
   return { ...snapshot, opponent: { ...snapshot.opponent, active: newActive } };
-}
-
-/** Normalize minimax value from [-1, 1] to [0, 1] for scoring */
-function normalizeMinimaxValue(value: number): number {
-  return (value + 1) / 2;
 }
 
 /**
