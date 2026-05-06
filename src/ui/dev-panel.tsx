@@ -110,7 +110,10 @@ function OpponentModelSection({ model }: { model: OpponentModel }) {
 }
 
 function OpponentMonRow({ mon }: { mon: OpponentPokemonModel }) {
-  const topSet = mon.possibleSets.length > 0 ? mon.possibleSets[0] : null;
+  // Collect all possible moves across remaining sets (deduplicated)
+  const allMoves = [...new Set(mon.possibleSets.flatMap(ws => ws.set.moves))].sort();
+  const allItems = [...new Set(mon.possibleSets.map(ws => ws.set.item))];
+  const allAbilities = [...new Set(mon.possibleSets.map(ws => ws.set.ability))];
 
   return (
     <div class="dev-opponent-mon">
@@ -118,17 +121,21 @@ function OpponentMonRow({ mon }: { mon: OpponentPokemonModel }) {
         <strong>{mon.species}</strong> — {mon.possibleSets.length} set{mon.possibleSets.length !== 1 ? 's' : ''} remaining
       </div>
       {mon.revealedMoves.length > 0 && (
-        <div class="dev-row dev-indent">Moves: {mon.revealedMoves.join(', ')}</div>
+        <div class="dev-row dev-indent">Revealed: {mon.revealedMoves.join(', ')}</div>
       )}
-      {mon.revealedAbility && (
-        <div class="dev-row dev-indent">Ability: {mon.revealedAbility}</div>
-      )}
-      {mon.revealedItem && (
-        <div class="dev-row dev-indent">Item: {mon.revealedItem}</div>
-      )}
-      {topSet && (
+      {allAbilities.length > 0 && (
         <div class="dev-row dev-indent">
-          Top set: {topSet.set.ability}{topSet.set.item ? ` / ${topSet.set.item}` : ''} ({Math.round(topSet.probability * 100)}%)
+          Ability: {mon.revealedAbility || (allAbilities.length === 1 ? `${allAbilities[0]} (inferred)` : allAbilities.join(' / '))}
+        </div>
+      )}
+      {allItems.length > 0 && (
+        <div class="dev-row dev-indent">
+          Item: {mon.revealedItem || (allItems.length === 1 ? `${allItems[0]} (inferred)` : allItems.join(' / '))}
+        </div>
+      )}
+      {allMoves.length > 0 && (
+        <div class="dev-row dev-indent">
+          Possible moves: {allMoves.join(', ')}
         </div>
       )}
     </div>

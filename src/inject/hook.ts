@@ -362,6 +362,7 @@
                 snapshot.opponent.active.level = parsed.level;
                 snapshot.opponent.active.hp = parsed.hp;
                 snapshot.opponent.active.hpMax = parsed.hpMax;
+                snapshot.opponent.active.status = null; // Clear default 'fnt' from uninitialized state
                 if (parsed.ability) snapshot.opponent.active.ability = parsed.ability;
               }
             }
