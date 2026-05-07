@@ -1,0 +1,23 @@
+{
+  "TrainingJobName": "randbats-alphazero",
+  "AlgorithmSpecification": {
+    "TrainingImage": "<ECR_IMAGE_URI>",
+    "TrainingInputMode": "File"
+  },
+  "ResourceConfig": {
+    "InstanceType": "ml.p3.2xlarge",
+    "InstanceCount": 1,
+    "VolumeSizeInGB": 50
+  },
+  "HyperParameters": {
+    "num_games": "50000",
+    "num_workers": "8",
+    "num_iterations": "100"
+  },
+  "StoppingCondition": {
+    "MaxRuntimeInSeconds": 86400
+  },
+  "OutputDataConfig": {
+    "S3OutputPath": "s3://randbats-training/output"
+  }
+}

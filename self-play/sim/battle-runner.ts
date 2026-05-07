@@ -5,6 +5,7 @@
 
 import {BattleStreams, Teams} from '@pkmn/sim';
 import {TeamGenerators} from '@pkmn/randoms';
+import type {MCTSConfig} from '../mcts/ismcts.ts';
 
 // Register the random team generator
 Teams.setGeneratorFactory(TeamGenerators);
@@ -62,6 +63,24 @@ function pickRandomAction(request: any): string {
 }
 
 const GAME_TIMEOUT_MS = 30_000;
+
+export type PolicyType = 'random' | 'mcts';
+
+/**
+ * Run a single game with the specified policy.
+ * MCTS policy is a placeholder — will be wired once the model is trained.
+ */
+export async function playGame(
+  policy: PolicyType = 'random',
+  _mctsConfig?: MCTSConfig,
+): Promise<GameResult> {
+  if (policy === 'mcts') {
+    // TODO: Wire MCTS policy once model is trained.
+    // For now, fall back to random.
+    console.warn('MCTS policy not yet wired — falling back to random');
+  }
+  return runGame();
+}
 
 /** Run a single game to completion with random moves */
 export async function runGame(): Promise<GameResult> {

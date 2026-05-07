@@ -12,6 +12,6 @@
     "rootDir": ".",
     "declaration": true
   },
-  "include": ["sim/**/*.ts"],
+  "include": ["sim/**/*.ts", "mcts/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }

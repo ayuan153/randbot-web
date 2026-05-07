@@ -1,0 +1,19 @@
+version: '3.8'
+services:
+  training:
+    build:
+      context: ..
+      dockerfile: self-play/Dockerfile
+    environment:
+      - NUM_GAMES=100
+      - NUM_WORKERS=4
+      - NUM_ITERATIONS=3
+    volumes:
+      - ./output:/app/output
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
