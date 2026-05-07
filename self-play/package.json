@@ -1,0 +1,21 @@
+{
+  "name": "randbats-self-play",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "play": "node --import tsx sim/sim-server.ts",
+    "test": "node --import tsx sim/sim-server.ts --games 10 --workers 2"
+  },
+  "dependencies": {
+    "@pkmn/sim": "latest",
+    "@pkmn/dex": "latest",
+    "@pkmn/data": "latest",
+    "@pkmn/randoms": "latest"
+  },
+  "devDependencies": {
+    "typescript": "^5.0",
+    "tsx": "^4.0",
+    "@types/node": "^20.0"
+  }
+}

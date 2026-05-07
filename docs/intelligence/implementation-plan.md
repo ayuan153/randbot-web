@@ -18,9 +18,9 @@ A phased roadmap to evolve randbats-bot from a heuristic depth-2 searcher (~1000
 
 ### Latest (2026-05-06)
 
-- Model v2 trained on 500K replays (23.5M samples), 64.9% accuracy
-- Wider model (512→256→128) only +0.7% over narrow — features are the bottleneck, not capacity
-- Adding features A-H: speed, type matchup, turns-to-KO, setup, stall, futility (~40 new features)
+- Model v3: 245 features, 65.5% accuracy, trained on 5M samples from 500K replays
+- Features include speed, type matchup, turns-to-KO, setup/stall detection
+- Pivoting to self-play training (AlphaZero-style) for next improvement
 
 ### Key Decision
 
@@ -30,7 +30,7 @@ A phased roadmap to evolve randbats-bot from a heuristic depth-2 searcher (~1000
 
 ---
 
-## Phase 1: Learned Evaluation Function (2-4 weeks) — CURRENT
+## Phase 1: Learned Evaluation Function (2-4 weeks) — DONE
 
 **Goal**: Replace heuristic scorer with neural net trained on replays. Target ~1300-1400 Elo.
 
@@ -129,105 +129,73 @@ src/eval/
 
 ---
 
-## Phase 2: Search Improvements (1-2 weeks) — NEXT
+## Phase 2: AlphaZero-Style Self-Play (3 weeks) — CURRENT
 
-**Goal**: Reach depth 3-4 with better move ordering and pruning under a 5-second time budget. Target ~1400-1500 Elo.
+**Goal**: Train via self-play to exceed human replay ceiling. Target ~1400+ Elo.
 
-### Tasks
+**Architecture**:
+```
+AWS (SageMaker/EC2 p5)
+├── self-play/sim/          Node.js: @pkmn/sim battle server (multi-core)
+├── self-play/mcts/         TypeScript: ISMCTS with policy/value guidance
+├── self-play/training/     Python: PyTorch AlphaZero training loop (GPU)
+└── self-play/elo/          Python: Elo tracking against baselines
+```
 
-#### 2.1 Move ordering heuristic
+**Week 1: Infrastructure + Sim Server**
+- @pkmn/sim wrapped in Node.js game server (bot vs bot)
+- Generates random teams, plays full games, outputs (state, action, outcome) tuples
+- Multi-core: worker_threads for parallel games (~2000-4000 games/sec)
+- Docker container for AWS deployment
 
-Order moves to maximize alpha-beta cutoffs:
+**Week 2: MCTS + Training Loop**
+- ISMCTS: determinize opponent hidden info, run MCTS per sample, aggregate
+- Policy net: 245 features → softmax over legal actions (guides MCTS exploration)
+- Value net: existing architecture (245 → 512 → 256 → 128 → 1)
+- Training loop: self-play (MCTS) → collect trajectories → train policy+value → export checkpoint → repeat
 
-1. **KO moves** (predicted to faint opponent's active) — highest priority
-2. **STAB super-effective moves** — likely high damage
-3. **Status moves on healthy targets** (Thunder Wave, Toxic, etc.)
-4. **Switches into resistances** (type advantage on predicted opponent move)
-5. **Everything else** — sorted by base power × STAB × effectiveness
+**Week 3: Tuning + Deployment**
+- Hyperparameter tuning (MCTS sims per move, exploration constant, temperature)
+- Elo tracking: play against fixed baselines (random, heuristic, v3 model)
+- Deploy best checkpoint to extension via ONNX export
+- Scale training if budget allows
 
-Expected improvement: 3-5x more cutoffs → effectively +1 depth for free.
+**Key Parameters**:
+- MCTS simulations per move: 100-400
+- Self-play games per iteration: 50K-100K
+- Training batch size: 2048
+- Learning rate: 1e-4 (lower for RL stability)
+- Temperature: 1.0 early, 0.3 late game (for exploration)
+- Determinizations per move: 5-10 (sample opponent hidden info)
 
-#### 2.2 Iterative deepening with time control
-
-- Start at depth 1, increase until time budget (5s) runs out
-- Return best result from deepest completed search
-- Aspiration windows: narrow alpha-beta bounds based on previous iteration's score
-
-#### 2.3 Transposition table
-
-- **Key**: Zobrist hash of (active mons, HP buckets, field conditions, boosts)
-- **Value**: (depth, score, best_move, flag: EXACT|LOWER|UPPER)
-- **Size**: 2^18 entries (~4MB), LRU eviction
-
-#### 2.4 Null-move-style pruning
-
-Skip evaluation of clearly dominated moves early (e.g., using a weak move when a KO move exists).
-
-### Deliverables
-
-| Artifact | Description |
-|----------|-------------|
-| `src/eval/move-ordering.ts` | Heuristic move ordering |
-| `src/eval/iterative-deepening.ts` | Time-controlled iterative deepening |
-| `src/eval/transposition-table.ts` | Zobrist hash + TT lookup/store |
-| `scripts/bench-search.ts` | Benchmark script |
-
----
-
-## Phase 3: ISMCTS + Policy Network (1-2 months) — FUTURE
-
-**Goal**: Properly handle hidden information via Monte Carlo sampling. Target ~1500+ Elo.
-
-### Overview
-
-Random Battles have significant hidden information (opponent's unrevealed moves, items, sets, team members, damage rolls). ISMCTS addresses this by:
-
-1. **Determinizing**: Sample opponent's hidden info from Bayesian model
-2. **Searching**: MCTS with UCB1 selection over information sets
-3. **Evaluating**: Value net scores leaf nodes (no random rollouts)
-4. **Guiding**: Policy network provides prior probabilities for move selection
-
-### Key Components
-
-- ISMCTS with 8-12 determinizations per search
-- Policy network (MLP, trained on 1500+ Elo player actions, ~35-40% top-1 accuracy)
-- UCB1 with policy priors: `Q(a) + c * P(a) * sqrt(N_parent) / (1 + N(a))`
-- Inference batching (16-32 leaf nodes per batch)
-
-### Deliverables
-
-- `src/search/ismcts.ts` — Full ISMCTS implementation
-- `src/search/determinize.ts` — Sample concrete states from information set
-- `training/train/policy_net.py` — Policy network training
-- `models/policy-net-v1.onnx` — Trained policy model
+**Infrastructure**:
+- Sim: Node.js with worker_threads, 16+ cores
+- Training: PyTorch on V100/A100 GPU
+- Storage: S3 for checkpoints and game logs
+- Flexible: works on EC2, SageMaker, or any Docker-compatible GPU instance
 
 ---
 
-## Phase 4: Self-Play + Exploitation (2-3 months) — STRETCH
+## Phase 3: Exploitation + Endgame Solving (2-3 months) — FUTURE
 
-**Goal**: Exceed the ceiling of human replay data through self-play RL. Target ~1600+ Elo.
+**Goal**: Exceed the ceiling of self-play through opponent exploitation and endgame solving. Target ~1600+ Elo.
 
 ### Overview
 
-- Self-play training loop generating games with latest nets
-- PPO or AlphaZero-style training (MCTS policy targets)
 - Opponent exploitation layer (detect patterns, adjust priors)
 - Endgame solving (1v1 Nash equilibrium, 2v2 CFR)
 
 ### Key Components
 
-- Self-play arena using `@pkmn/sim` for game generation
 - Pattern tracker for opponent tendencies (switch frequency, status usage, Tera timing)
 - 1v1 Nash solver (game matrix → linear program)
 - 2v2 CFR solver (~1000 iterations convergence)
 
 ### Deliverables
 
-- `training/self-play/arena.py` — Self-play game generation
-- `training/self-play/train_loop.py` — RL training loop
 - `src/exploit/pattern-tracker.ts` — Per-game opponent pattern detection
 - `src/endgame/nash-solver.ts` — 1v1 Nash equilibrium solver
-- `models/value-net-v2-selfplay.onnx` — Self-play trained nets
+- `models/value-net-v3-selfplay.onnx` — Self-play trained nets
 
 ---
 
@@ -238,11 +206,9 @@ Random Battles have significant hidden information (opponent's unrevealed moves,
 | 1 | Value net accuracy | >65% | Held-out validation set |
 | 1 | Win rate vs heuristic | >60% | 500-game A/B test |
 | 1 | Inference latency | <10ms/position | Browser profiling |
-| 2 | Effective search depth | 3-4 plies | Iterative deepening log |
-| 2 | Win rate vs Phase 1 | >55% | 500-game A/B test |
-| 3 | Ladder Elo | 1500+ | 200+ rated games on PS ladder |
-| 3 | Simulations/second | >1000 | MCTS benchmark |
-| 4 | Ladder Elo | 1600+ | 200+ rated games on PS ladder |
+| 2 | Ladder Elo | 1400+ | 200+ rated games on PS ladder |
+| 2 | Self-play games/sec | >2000 | Sim benchmark (multi-core) |
+| 3 | Ladder Elo | 1600+ | 200+ rated games on PS ladder |
 
 ---
 
@@ -252,10 +218,10 @@ Random Battles have significant hidden information (opponent's unrevealed moves,
 |---------|---------|-------|
 | `@smogon/calc` | Damage calculation (search + display) | All |
 | `onnxruntime-web` | Browser ML inference (WASM backend) | 1+ |
-| `PyTorch` | Model training (Python) | 1, 3, 4 |
+| `PyTorch` | Model training (Python) | 1, 2, 3 |
 | `onnx` | Model export format | 1+ |
-| `replay.pokemonshowdown.com` | Training data source | 1, 3 |
-| `@pkmn/sim` | Test fixture generation | All |
+| `replay.pokemonshowdown.com` | Training data source | 1 |
+| `@pkmn/sim` | Self-play game simulation | 2+ |
 | `@pkmn/data` | Pokemon/move/ability data | All |
 
 ---
@@ -268,19 +234,19 @@ Random Battles have significant hidden information (opponent's unrevealed moves,
 | ONNX Runtime Web performance | Slow inference blocks search | Quantize model to int8, reduce features, batch inference |
 | Overfitting to replay meta | Bot plays outdated strategies | Include only recent replays (last 3 months), periodic retraining |
 | Chrome extension CSP blocks WASM | Can't load ONNX runtime | Use offscreen document (relaxed CSP) |
-| 206 features insufficient | Low accuracy ceiling | Iterate on feature engineering, add per-move features if needed |
-| Self-play mode collapse (Phase 4) | Degenerate strategies | Diverse opponent pool, noise injection, ladder validation |
+| Self-play mode collapse | Degenerate strategies | Diverse opponent pool, noise injection, ladder validation |
+| ISMCTS determinization quality | Poor search with bad opponent samples | Use Bayesian opponent model to inform determinizations |
+| GPU training cost | Budget overrun | Start with small runs, scale only after validating Elo gains |
 
 ---
 
 ## Timeline
 
 ```
-Week 1-2:   Phase 1a — Replay scraper, feature extraction, initial training
-Week 3-4:   Phase 1b — ONNX export, browser integration, A/B testing
-Week 5-6:   Phase 2  — Move ordering, iterative deepening, depth 3-4
-Week 7-10:  Phase 3  — ISMCTS, policy net, integration + tuning
-Week 11-18: Phase 4  — Self-play, exploitation, endgame solving
+Week 1-2:   Phase 1a — Replay scraper, feature extraction, initial training ✅
+Week 3-4:   Phase 1b — ONNX export, browser integration, A/B testing ✅
+Week 5-7:   Phase 2  — Self-play infrastructure, ISMCTS, training loop
+Week 8-12:  Phase 3  — Exploitation, endgame solving, ladder testing
 ```
 
 All timelines assume single developer, part-time (~20 hrs/week). Phases are sequential.
@@ -296,3 +262,5 @@ All timelines assume single developer, part-time (~20 hrs/week). Phases are sequ
 | 2026-05-05 | Feature vector design: ~206 fixed-size features. | Compact enough for fast inference (<10ms), rich enough to capture key battle dynamics. Expandable if accuracy plateaus. |
 | 2026-05-06 | Wider model (512→256→128) only +0.7% over narrow. Features are the bottleneck, not capacity. | 64.9% vs 64.2% — diminishing returns from model size. Investment should go into feature engineering. |
 | 2026-05-06 | Adding ~40 new features focused on speed, matchup dynamics, setup/stall patterns. | Speed awareness, type matchup depth, turns-to-KO, setup detection, stall detection, futility signals. |
+| 2026-05-06 | Starting AlphaZero-style self-play. @pkmn/sim is fast enough (~2000-4000 games/sec multi-core). | Building own sim deferred unless sim becomes bottleneck. Human replay ceiling reached at 65.5% accuracy. |
+| 2026-05-06 | Using ISMCTS (not pure MCTS) to handle hidden information via determinization. | Random Battles have significant hidden info (opponent sets, unrevealed mons). Determinization samples from Bayesian model to handle this properly. |
