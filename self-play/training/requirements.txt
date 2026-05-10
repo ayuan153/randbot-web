@@ -3,3 +3,4 @@ numpy>=1.24
 onnx>=1.14
 onnxruntime>=1.15
 tqdm>=4.65
+onnxscript>=0.1

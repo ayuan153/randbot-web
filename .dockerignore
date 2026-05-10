@@ -1,0 +1,8 @@
+node_modules/
+dist/
+training/data/
+training/models/
+self-play/output/
+self-play/node_modules/
+.yolo-sisyphus/
+.git/

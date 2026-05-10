@@ -1,13 +1,33 @@
 #!/bin/bash
 set -euo pipefail
 
-# Resolve script directory (works both locally and in Docker)
+# Resolve directories (works both locally and in Docker)
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# Find self-play dir (has sim/ subdirectory)
+if [ -d "$SCRIPT_DIR/sim" ]; then
+    SELF_PLAY_DIR="$SCRIPT_DIR"
+elif [ -d "$SCRIPT_DIR/self-play/sim" ]; then
+    SELF_PLAY_DIR="$SCRIPT_DIR/self-play"
+else
+    echo "ERROR: Cannot find sim/ directory" >&2; exit 1
+fi
+
+# Find training script
+if [ -f "$SELF_PLAY_DIR/training/alphazero_loop.py" ]; then
+    TRAIN_SCRIPT="$SELF_PLAY_DIR/training/alphazero_loop.py"
+elif [ -f "$SCRIPT_DIR/training/alphazero_loop.py" ]; then
+    TRAIN_SCRIPT="$SCRIPT_DIR/training/alphazero_loop.py"
+elif [ -f "/app/training/alphazero_loop.py" ]; then
+    TRAIN_SCRIPT="/app/training/alphazero_loop.py"
+else
+    echo "ERROR: Cannot find alphazero_loop.py" >&2; exit 1
+fi
 
 NUM_GAMES=${NUM_GAMES:-10000}
 NUM_WORKERS=${NUM_WORKERS:-8}
 NUM_ITERATIONS=${NUM_ITERATIONS:-100}
-OUTPUT_DIR=${OUTPUT_DIR:-$SCRIPT_DIR/output}
+OUTPUT_DIR=${OUTPUT_DIR:-$SELF_PLAY_DIR/output}
 EPOCHS=${EPOCHS:-20}
 
 mkdir -p "$OUTPUT_DIR/games" "$OUTPUT_DIR/models"
@@ -19,7 +39,8 @@ for i in $(seq 1 $NUM_ITERATIONS); do
 
     # 1. Self-play
     echo "Running $NUM_GAMES self-play games..."
-    node --import tsx "$SCRIPT_DIR/sim/sim-server.ts" \
+    cd "$SELF_PLAY_DIR"
+    node --import tsx sim/sim-server.ts \
         --games "$NUM_GAMES" \
         --workers "$NUM_WORKERS" \
         --output "$OUTPUT_DIR/games/iter_${i}.jsonl"
@@ -31,7 +52,7 @@ for i in $(seq 1 $NUM_ITERATIONS); do
         CHECKPOINT_ARGS="--checkpoint $PREV_CHECKPOINT"
     fi
 
-    python3 "$SCRIPT_DIR/training/alphazero_loop.py" \
+    python3 "$TRAIN_SCRIPT" \
         --data "$OUTPUT_DIR/games/iter_${i}.jsonl" \
         --epochs "$EPOCHS" \
         --output "$OUTPUT_DIR/models/iter_${i}.onnx" \
