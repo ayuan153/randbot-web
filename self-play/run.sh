@@ -29,6 +29,8 @@ NUM_WORKERS=${NUM_WORKERS:-8}
 NUM_ITERATIONS=${NUM_ITERATIONS:-100}
 OUTPUT_DIR=${OUTPUT_DIR:-$SELF_PLAY_DIR/output}
 EPOCHS=${EPOCHS:-20}
+POLICY=${POLICY:-mcts}
+MCTS_SIMS=${MCTS_SIMS:-32}
 
 mkdir -p "$OUTPUT_DIR/games" "$OUTPUT_DIR/models"
 
@@ -43,7 +45,9 @@ for i in $(seq 1 $NUM_ITERATIONS); do
     node --import tsx sim/sim-server.ts \
         --games "$NUM_GAMES" \
         --workers "$NUM_WORKERS" \
-        --output "$OUTPUT_DIR/games/iter_${i}.jsonl"
+        --output "$OUTPUT_DIR/games/iter_${i}.jsonl" \
+        --policy "$POLICY" \
+        --mcts-sims "$MCTS_SIMS"
 
     # 2. Train
     echo "Training on collected games..."

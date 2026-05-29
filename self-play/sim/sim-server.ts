@@ -1,15 +1,19 @@
 /**
  * sim-server.ts — Orchestrator: runs parallel games, collects results, writes output.
- * Usage: node --import tsx sim/sim-server.ts --games 100 --workers 4 --output results.jsonl
+ * Usage: node --import tsx sim/sim-server.ts --games 100 --workers 4 --output results.jsonl --policy random|mcts
  */
 
 import {writeFileSync} from 'node:fs';
-import {runGame, type GameResult} from './battle-runner.ts';
+import {playGame, type GameResult, type PolicyType} from './battle-runner.ts';
+import {DEFAULT_MCTS_CONFIG, type MCTSConfig} from '../mcts/ismcts.ts';
 
 interface Config {
   numGames: number;
   numWorkers: number;
   output: string;
+  policy: PolicyType;
+  mctsSims: number;
+  mctsDeterminizations: number;
 }
 
 function parseArgs(): Config {
@@ -17,17 +21,23 @@ function parseArgs(): Config {
   let numGames = 100;
   let numWorkers = 4;
   let output = 'results.jsonl';
+  let policy: PolicyType = 'random';
+  let mctsSims = 32;
+  let mctsDeterminizations = 5;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--games') numGames = parseInt(args[++i]);
     else if (args[i] === '--workers') numWorkers = parseInt(args[++i]);
     else if (args[i] === '--output') output = args[++i];
+    else if (args[i] === '--policy') policy = args[++i] as PolicyType;
+    else if (args[i] === '--mcts-sims') mctsSims = parseInt(args[++i]);
+    else if (args[i] === '--mcts-determinizations') mctsDeterminizations = parseInt(args[++i]);
   }
-  return {numGames, numWorkers, output};
+  return {numGames, numWorkers, output, policy, mctsSims, mctsDeterminizations};
 }
 
 /** Run games concurrently in-process (each game is async, so they interleave) */
-async function runGamesInProcess(numGames: number, concurrency: number): Promise<GameResult[]> {
+async function runGamesInProcess(numGames: number, concurrency: number, policy: PolicyType, mctsConfig?: MCTSConfig): Promise<GameResult[]> {
   const results: GameResult[] = [];
   let started = 0;
   let timeouts = 0;
@@ -36,7 +46,7 @@ async function runGamesInProcess(numGames: number, concurrency: number): Promise
     while (started < numGames) {
       started++;
       try {
-        results.push(await runGame());
+        results.push(await playGame(policy, mctsConfig));
       } catch {
         // Game timed out or errored — skip it and try another
         timeouts++;
@@ -53,10 +63,14 @@ async function runGamesInProcess(numGames: number, concurrency: number): Promise
 async function main() {
   const config = parseArgs();
 
-  console.log(`Running ${config.numGames} games (concurrency: ${config.numWorkers})...`);
+  console.log(`Running ${config.numGames} games (concurrency: ${config.numWorkers}, policy: ${config.policy}${config.policy === 'mcts' ? `, sims: ${config.mctsSims}, dets: ${config.mctsDeterminizations}` : ''})...`);
   const startTime = Date.now();
 
-  const results = await runGamesInProcess(config.numGames, config.numWorkers);
+  const mctsConfig = config.policy === 'mcts'
+    ? {...DEFAULT_MCTS_CONFIG, numSimulations: config.mctsSims, numDeterminizations: config.mctsDeterminizations}
+    : undefined;
+
+  const results = await runGamesInProcess(config.numGames, config.numWorkers, config.policy, mctsConfig);
 
   const elapsed = (Date.now() - startTime) / 1000;
   const throughput = results.length / elapsed;
