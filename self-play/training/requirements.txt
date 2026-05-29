@@ -1,4 +1,4 @@
-torch>=2.0
+torch==2.5.1+cu121
 numpy>=1.24
 onnx>=1.14
 onnxruntime>=1.15

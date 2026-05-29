@@ -18,7 +18,7 @@ COPY self-play/tsconfig.json ./
 # Python training
 WORKDIR /app/training
 COPY self-play/training/requirements.txt ./
-RUN pip3 install --no-cache-dir -r requirements.txt
+RUN pip3 install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cu121 -r requirements.txt
 COPY self-play/training/ ./
 
 # Feature extraction from main training pipeline
