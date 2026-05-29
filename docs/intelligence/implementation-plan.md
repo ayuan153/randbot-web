@@ -174,6 +174,56 @@ AWS (SageMaker/EC2 p5)
 - Storage: S3 for checkpoints and game logs
 - Flexible: works on EC2, SageMaker, or any Docker-compatible GPU instance
 
+### Phase 2 Progress (2026-05-29)
+
+- ✅ Self-play Docker image built and verified locally (Colima x86_64, `@pkmn/sim` + ISMCTS + PyTorch training loop)
+- ✅ AWS infrastructure provisioned: ECR repo, S3 bucket (`randbats-training-516246239933`), IAM role (`SageMakerRandbatsRole`)
+- ✅ Validation training job launched on SageMaker: `randbats-alphazero-validation-20260529-1048`
+  - Instance: ml.g4dn.xlarge (~$0.74/hr), 2hr max runtime
+  - Config: 5 iterations, 1000 games/iteration, 10 epochs, 4 workers
+  - This is a frugal validation run to confirm the pipeline works end-to-end
+- ⏳ Next: monitor job completion, retrieve ONNX model from S3, integrate into extension, then plan scale-up run
+
+### Validation run #1 — FAILED (2026-05-29)
+
+- Job `randbats-alphazero-validation-20260529-1048` FAILED after 125s with `AlgorithmError: exit code 1`
+- **CloudWatch root cause**: `[FATAL tini (14)] exec ./run.sh failed: Exec format error`
+- **Diagnosis**: Docker image built on Apple Silicon (arm64) without `--platform linux/amd64`.
+  Multi-arch base `nvidia/cuda:12.1.0-runtime-ubuntu22.04` defaulted to arm64; cannot exec on
+  x86_64 SageMaker instance (ml.g4dn.xlarge). `run.sh` shebang and line-endings verified correct — ruled out.
+- **Fix**: new `self-play/build-and-push.sh` builds with `docker buildx build --platform linux/amd64`
+  and pushes to ECR. Relaunch with a new timestamped job name.
+- **Status**: fix scripted; rebuild + push + relaunch pending (requires Docker + ECR creds, ~$1.50 spend)
+
+### Validation run #2 — SUCCESS + persistence fix (2026-05-29)
+
+- **Architecture fix worked:** Rebuilt image for `linux/amd64` (new `self-play/build-and-push.sh` using
+  `docker buildx build --platform linux/amd64`; installed buildx + docker-container builder locally).
+  Job `randbats-alphazero-validation-20260529-1227` (ml.g4dn.xlarge, `--environment NUM_ITERATIONS=5,NUM_GAMES=1000,EPOCHS=10,NUM_WORKERS=4`) ran to **Completed** (~24 min billable).
+  All 5 iterations completed self-play → train → ONNX export. Validation success criteria MET.
+- **Launch mechanism gotcha:** Image uses plain CUDA base with NO `sagemaker-training-toolkit`, so
+  `--hyper-parameters` only land in `/opt/ml/input/config/hyperparameters.json` and never reach `run.sh`.
+  Must pass run-config via `--environment` (NUM_ITERATIONS/NUM_GAMES/EPOCHS/NUM_WORKERS), NOT `--hyper-parameters`.
+- **Persistence bug found + FIXED:** First Completed run produced an EMPTY S3 output — `run.sh` wrote
+  artifacts to `$OUTPUT_DIR/models` (=/app/output/models) but never to `/opt/ml/model/` (the only dir
+  SageMaker tars to S3). Fix in `self-play/run.sh`: (1) pass `--checkpoint "$OUTPUT_DIR/models/checkpoint.pt"`
+  (also fixes latent resume bug — checkpoint saved to CWD while resume looked in models dir), and
+  (2) append guarded `cp -r "$OUTPUT_DIR/models/." /opt/ml/model/` when `/opt/ml/model` exists.
+  Proven via smoke job `randbats-alphazero-smoke-20260529-1301` (1 iter, 20 games) → real 1.4 MB
+  `model.tar.gz` containing `iter_1.onnx` (+ `.onnx.data` external weights) and `checkpoint.pt`.
+- **Open issues before production scale-up (BLOCKERS):**
+  - **GPU unused:** requirements pull CUDA 13 torch build (`nvidia-cudnn-cu13`, `cuda-toolkit==13.0.2`)
+    incompatible with g4dn driver → training ran on CPU. Pin torch to cu121 wheel (matching
+    `nvidia/cuda:12.1.0` base) before scaling up.
+  - **MCTS not wired into self-play:** sim battle-runner falls back to random play; models train on
+    random-policy games (validates plumbing only, not strength). Wire ISMCTS policy/value guidance
+    before a meaningful training run.
+  - **Feature mismatch:** model is a 20-feature `PolicyValueNet` — NOT compatible with the browser's
+    206-feature v1 inference (`learned-eval.ts`). Do NOT drop in as value-net-v2 without aligning
+    feature space. v1 model left untouched.
+- **Status / next:** Image at `randbats-training:latest` is correct (amd64 + artifact persistence).
+  Real prerequisites for a useful run are the GPU/CUDA pin and MCTS wiring.
+
 ---
 
 ## Phase 3: Exploitation + Endgame Solving (2-3 months) — FUTURE
