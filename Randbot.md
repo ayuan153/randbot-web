@@ -5,10 +5,12 @@ Current system state and design decisions for randbats-bot.
 ## Current State
 
 - Chrome extension for Pokémon Showdown Gen 9 Random Battles
-- Neural network evaluation: MLP trained on 500K games (23.5M samples), 64.9% win prediction accuracy
+- Neural network evaluation: MLP (245→512→256→128→1) trained on 500K games, 65.5% win prediction accuracy
+- 245 features including speed, type matchup, turns-to-KO, setup/stall detection, futility
 - Depth-2 expectiminimax search with alpha-beta pruning
 - Bayesian opponent model (narrows possible sets as moves/items/abilities revealed)
 - Dev mode overlay + turn logging for observability
+- Self-play training infrastructure built (Docker, ISMCTS, AlphaZero loop) — ready for GPU training
 
 ## Architecture
 
@@ -64,10 +66,10 @@ EVAL WORKER (eval-worker.ts)
 
 ## Next Steps
 
-- Adding ~40 new features (A-H): speed, type matchup, turns-to-KO, setup, stall, futility
-- Retrain on enriched feature set (target: >68% accuracy)
-- Move ordering + iterative deepening for effective depth 3-4
-- Deeper search or MCTS when faster simulation available
+- **IMMEDIATE**: Run AlphaZero self-play training on AWS SageMaker (Docker image ready, needs ECR push + IAM role)
+- After training: pull ONNX model from S3, drop into `models/`, rebuild extension
+- Evaluate trained model vs baselines (Elo tracking built)
+- If sim speed becomes bottleneck: build faster Rust/Zig sim for Gen 9
 
 ## Key Decisions
 
@@ -76,4 +78,6 @@ EVAL WORKER (eval-worker.ts)
 | 2026-05-05 | @pkmn/engine Gen 1 only — pivot to learned eval as priority |
 | 2026-05-05 | HuggingFace dataset over scraping (no rate limits, 31.7M replays) |
 | 2026-05-06 | Wider model (512→256→128) only +0.7% — features are the bottleneck |
-| 2026-05-06 | Adding ~40 features focused on speed, matchup dynamics, setup/stall |
+| 2026-05-06 | Added 39 features (speed, type matchup, setup/stall, futility) → 245 total |
+| 2026-05-06 | Self-play via AlphaZero-style ISMCTS, @pkmn/sim for Gen 9 battles |
+| 2026-05-09 | Docker image verified end-to-end locally, ready for SageMaker |
