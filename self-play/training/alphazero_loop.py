@@ -204,15 +204,29 @@ def load_game_data(data_path: str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
                     feats = extract_features_from_request(request, opp_request, turn_num)
                     states.append(feats)
 
-                    # Policy target: one-hot from actual choice
+                    # Policy target: use MCTS visit probs if available, else one-hot from choice
+                    mcts_policy = turn_data.get(f"{player}Policy")
                     action_idx = parse_choice(choice)
                     policy = np.zeros(10, dtype=np.float32)
-                    mask = get_action_mask(request)
-                    # Use uniform over legal actions with emphasis on chosen action
-                    if mask.sum() > 0:
-                        policy = mask / mask.sum()  # uniform baseline
-                    policy[action_idx] = 1.0
-                    policy /= policy.sum()  # renormalize
+
+                    if mcts_policy and isinstance(mcts_policy, dict):
+                        # Map MCTS action probs to the 10-action index space
+                        for action_str, prob in mcts_policy.items():
+                            idx = parse_choice(action_str)
+                            policy[idx] += prob
+                        # Renormalize in case of rounding
+                        total = policy.sum()
+                        if total > 0:
+                            policy /= total
+                        else:
+                            policy[action_idx] = 1.0
+                    else:
+                        # Fallback: one-hot with uniform baseline over legal actions
+                        mask = get_action_mask(request)
+                        if mask.sum() > 0:
+                            policy = mask / mask.sum()  # uniform baseline
+                        policy[action_idx] = 1.0
+                        policy /= policy.sum()  # renormalize
                     policies.append(policy)
 
                     # Value target
@@ -253,6 +267,7 @@ def train_model(
     Returns list of per-epoch losses.
     """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}", flush=True)
     model = model.to(device)
     model.train()
 
