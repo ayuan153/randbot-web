@@ -56,6 +56,7 @@ for i in $(seq 1 $NUM_ITERATIONS); do
         --data "$OUTPUT_DIR/games/iter_${i}.jsonl" \
         --epochs "$EPOCHS" \
         --output "$OUTPUT_DIR/models/iter_${i}.onnx" \
+        --checkpoint "$OUTPUT_DIR/models/checkpoint.pt" \
         $CHECKPOINT_ARGS
 
     PREV_CHECKPOINT="$OUTPUT_DIR/models/checkpoint.pt"
@@ -64,3 +65,9 @@ for i in $(seq 1 $NUM_ITERATIONS); do
 done
 
 echo "Training complete. Models saved to $OUTPUT_DIR/models/"
+
+# Persist artifacts to SageMaker's model dir (only present on SageMaker)
+if [ -d /opt/ml/model ]; then
+  cp -r "$OUTPUT_DIR/models/." /opt/ml/model/
+  echo "Copied artifacts to /opt/ml/model/"
+fi
