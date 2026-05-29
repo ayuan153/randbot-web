@@ -3,9 +3,11 @@
  * Both sides play random legal moves. Returns the full game trajectory.
  */
 
-import {BattleStreams, Teams} from '@pkmn/sim';
+import {Battle, BattleStreams, Teams, toID} from '@pkmn/sim';
 import {TeamGenerators} from '@pkmn/randoms';
+import {runMCTS, uniformPolicy, neutralValue, DEFAULT_MCTS_CONFIG} from '../mcts/ismcts.ts';
 import type {MCTSConfig} from '../mcts/ismcts.ts';
+import {BattleAdapter} from './battle-adapter.ts';
 
 // Register the random team generator
 Teams.setGeneratorFactory(TeamGenerators);
@@ -16,6 +18,8 @@ export interface TurnRecord {
   p2Request: object;
   p1Choice: string;
   p2Choice: string;
+  p1Policy?: Record<string, number>;
+  p2Policy?: Record<string, number>;
 }
 
 export interface GameResult {
@@ -68,18 +72,106 @@ export type PolicyType = 'random' | 'mcts';
 
 /**
  * Run a single game with the specified policy.
- * MCTS policy is a placeholder — will be wired once the model is trained.
+ * 'random' uses uniform random moves (fast).
+ * 'mcts' uses ISMCTS with uniform policy/neutral value (slower but non-random).
  */
 export async function playGame(
   policy: PolicyType = 'random',
-  _mctsConfig?: MCTSConfig,
+  mctsConfig?: MCTSConfig,
 ): Promise<GameResult> {
   if (policy === 'mcts') {
-    // TODO: Wire MCTS policy once model is trained.
-    // For now, fall back to random.
-    console.warn('MCTS policy not yet wired — falling back to random');
+    return runMCTSGame(mctsConfig ?? DEFAULT_MCTS_CONFIG);
   }
   return runGame();
+}
+
+/** Run a single game using ISMCTS for both players' decisions */
+async function runMCTSGame(config: MCTSConfig): Promise<GameResult> {
+  return Promise.race([
+    runMCTSGameInternal(config),
+    new Promise<GameResult>((_, reject) =>
+      setTimeout(() => reject(new Error('Game timed out')), GAME_TIMEOUT_MS)
+    ),
+  ]);
+}
+
+async function runMCTSGameInternal(config: MCTSConfig): Promise<GameResult> {
+  const battle = new Battle({formatid: toID('gen9randombattle')});
+  battle.setPlayer('p1', {name: 'Bot1'});
+  battle.setPlayer('p2', {name: 'Bot2'});
+
+  const turns: TurnRecord[] = [];
+  let turnNum = 0;
+
+  while (!battle.ended) {
+    const p1Request = battle.p1.activeRequest;
+    const p2Request = battle.p2.activeRequest;
+
+    if (!p1Request && !p2Request) break;
+
+    // Skip wait/teamPreview requests
+    const p1NeedsChoice = p1Request && !(p1Request as {wait?: boolean}).wait && !(p1Request as {teamPreview?: boolean}).teamPreview;
+    const p2NeedsChoice = p2Request && !(p2Request as {wait?: boolean}).wait && !(p2Request as {teamPreview?: boolean}).teamPreview;
+
+    if (!p1NeedsChoice && !p2NeedsChoice) {
+      // Both are wait/teamPreview — send defaults
+      if (p1Request) battle.choose('p1', 'default');
+      if (p2Request) battle.choose('p2', 'default');
+      continue;
+    }
+
+    let p1Choice = 'default';
+    let p2Choice = 'default';
+    let p1Policy: Record<string, number> | undefined;
+    let p2Policy: Record<string, number> | undefined;
+
+    if (p1NeedsChoice) {
+      const adapter = new BattleAdapter(battle, 'p1');
+      const legalActions = adapter.getLegalActions();
+      if (legalActions.length > 1 || legalActions[0] !== 'default') {
+        const policyFn = () => uniformPolicy(legalActions);
+        const result = await runMCTS(adapter, legalActions, policyFn, neutralValue, config);
+        p1Choice = result.bestAction;
+        p1Policy = Object.fromEntries(result.actionProbs);
+      }
+    }
+
+    if (p2NeedsChoice) {
+      const adapter = new BattleAdapter(battle, 'p2');
+      const legalActions = adapter.getLegalActions();
+      if (legalActions.length > 1 || legalActions[0] !== 'default') {
+        const policyFn = () => uniformPolicy(legalActions);
+        const result = await runMCTS(adapter, legalActions, policyFn, neutralValue, config);
+        p2Choice = result.bestAction;
+        p2Policy = Object.fromEntries(result.actionProbs);
+      }
+    }
+
+    turns.push({
+      turn: turnNum,
+      p1Request: p1Request ? JSON.parse(JSON.stringify(p1Request)) : {},
+      p2Request: p2Request ? JSON.parse(JSON.stringify(p2Request)) : {},
+      p1Choice,
+      p2Choice,
+      ...(p1Policy && {p1Policy}),
+      ...(p2Policy && {p2Policy}),
+    });
+
+    if (p1NeedsChoice) battle.choose('p1', p1Choice);
+    if (p2NeedsChoice) battle.choose('p2', p2Choice);
+    if (!p1NeedsChoice && p1Request) battle.choose('p1', 'default');
+    if (!p2NeedsChoice && p2Request) battle.choose('p2', 'default');
+    turnNum++;
+  }
+
+  const winner: 'p1' | 'p2' = battle.winner === 'Bot1' ? 'p1' : 'p2';
+
+  return {
+    log: battle.log.join('\n'),
+    turns,
+    winner,
+    numTurns: battle.turn,
+  };
 }
 
 /** Run a single game to completion with random moves */
