@@ -291,12 +291,19 @@ export async function playEvalGame(
   p2Policy: EvalPolicy,
   mctsConfig?: MCTSConfig,
 ): Promise<GameResult> {
-  return Promise.race([
-    playEvalGameInternal(p1Policy, p2Policy, mctsConfig ?? DEFAULT_MCTS_CONFIG),
-    new Promise<GameResult>((_, reject) =>
-      setTimeout(() => reject(new Error('Game timed out')), GAME_TIMEOUT_MS)
-    ),
-  ]);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      playEvalGameInternal(p1Policy, p2Policy, mctsConfig ?? DEFAULT_MCTS_CONFIG),
+      new Promise<GameResult>((_, reject) => {
+        timer = setTimeout(() => reject(new Error('Game timed out')), GAME_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    // Clear the timer so a settled game doesn't leave a pending timeout
+    // keeping the event loop (and the process) alive until it expires.
+    if (timer) clearTimeout(timer);
+  }
 }
 
 async function playEvalGameInternal(

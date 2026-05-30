@@ -74,23 +74,21 @@ async function main() {
   const mctsConfig = {...DEFAULT_MCTS_CONFIG, numSimulations: config.mctsSims, numDeterminizations: config.mctsDeterminizations};
 
   if (evalMode) {
-    log(`Eval: ${config.numGames} games, ${config.p1Policy} vs ${config.p2Policy} (concurrency: ${config.numWorkers})`);
+    log(`Eval: ${config.numGames} games, ${config.p1Policy} vs ${config.p2Policy} (serial, sims: ${config.mctsSims})`);
     const startTime = Date.now();
     const results: GameResult[] = [];
-    let started = 0;
 
-    async function worker() {
-      while (started < config.numGames) {
-        started++;
-        try {
-          results.push(await playEvalGame(config.p1Policy!, config.p2Policy!, mctsConfig));
-        } catch {
-          // Game timed out — skip
-        }
+    // Run eval games SERIALLY (ignore --workers). MCTS is CPU-bound and runs
+    // synchronously, so concurrency gives no real parallelism (gotcha #4) and
+    // only inflates each game's wall-clock past GAME_TIMEOUT_MS — under 4-way
+    // contention every game timed out on SageMaker, yielding 0 scored games.
+    for (let g = 0; g < config.numGames; g++) {
+      try {
+        results.push(await playEvalGame(config.p1Policy!, config.p2Policy!, mctsConfig));
+      } catch {
+        // Game timed out — skip
       }
     }
-
-    await Promise.all(Array.from({length: config.numWorkers}, () => worker()));
     const elapsed = (Date.now() - startTime) / 1000;
     log(`Completed ${results.length} games in ${elapsed.toFixed(1)}s`);
 

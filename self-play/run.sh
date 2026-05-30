@@ -71,7 +71,7 @@ for i in $(seq 1 $NUM_ITERATIONS); do
 
     if [ "$RUN_ELO" = "1" ]; then
         echo "=== Iteration $i: Elo eval (mcts vs random/heuristic) ==="
-        python3 "$ELO_SCRIPT" --model mcts --games "$ELO_GAMES" \
+        python3 "$ELO_SCRIPT" --model mcts --games "$ELO_GAMES" --mcts-sims "$MCTS_SIMS" \
             --output "$OUTPUT_DIR/models/elo_iter_${i}.json" || echo "WARN: Elo eval failed (non-fatal)"
     fi
 
