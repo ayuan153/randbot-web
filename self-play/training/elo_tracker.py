@@ -86,3 +86,4 @@ if __name__ == '__main__':
     for baseline, data in results.items():
         if baseline != 'estimated_elo':
             print(f"  {baseline}: {data}")
+    print(f"[Elo] vs_random={results['vs_random']['elo']:.1f} vs_heuristic={results['vs_heuristic']['elo']:.1f} estimated={results['estimated_elo']:.1f}")

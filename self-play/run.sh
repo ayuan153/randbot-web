@@ -31,6 +31,10 @@ OUTPUT_DIR=${OUTPUT_DIR:-$SELF_PLAY_DIR/output}
 EPOCHS=${EPOCHS:-20}
 POLICY=${POLICY:-mcts}
 MCTS_SIMS=${MCTS_SIMS:-32}
+ELO_GAMES=${ELO_GAMES:-20}
+RUN_ELO=${RUN_ELO:-1}
+
+ELO_SCRIPT="$(dirname "$TRAIN_SCRIPT")/elo_tracker.py"
 
 mkdir -p "$OUTPUT_DIR/games" "$OUTPUT_DIR/models"
 
@@ -64,6 +68,12 @@ for i in $(seq 1 $NUM_ITERATIONS); do
         $CHECKPOINT_ARGS
 
     PREV_CHECKPOINT="$OUTPUT_DIR/models/checkpoint.pt"
+
+    if [ "$RUN_ELO" = "1" ]; then
+        echo "=== Iteration $i: Elo eval (mcts vs random/heuristic) ==="
+        python3 "$ELO_SCRIPT" --model mcts --games "$ELO_GAMES" \
+            --output "$OUTPUT_DIR/models/elo_iter_${i}.json" || echo "WARN: Elo eval failed (non-fatal)"
+    fi
 
     echo "Iteration $i complete."
 done

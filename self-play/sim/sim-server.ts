@@ -4,7 +4,7 @@
  */
 
 import {writeFileSync} from 'node:fs';
-import {playGame, type GameResult, type PolicyType} from './battle-runner.ts';
+import {playGame, playEvalGame, type GameResult, type PolicyType, type EvalPolicy} from './battle-runner.ts';
 import {DEFAULT_MCTS_CONFIG, type MCTSConfig} from '../mcts/ismcts.ts';
 
 interface Config {
@@ -14,6 +14,8 @@ interface Config {
   policy: PolicyType;
   mctsSims: number;
   mctsDeterminizations: number;
+  p1Policy?: EvalPolicy;
+  p2Policy?: EvalPolicy;
 }
 
 function parseArgs(): Config {
@@ -24,6 +26,8 @@ function parseArgs(): Config {
   let policy: PolicyType = 'random';
   let mctsSims = 32;
   let mctsDeterminizations = 5;
+  let p1Policy: EvalPolicy | undefined;
+  let p2Policy: EvalPolicy | undefined;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--games') numGames = parseInt(args[++i]);
@@ -32,8 +36,10 @@ function parseArgs(): Config {
     else if (args[i] === '--policy') policy = args[++i] as PolicyType;
     else if (args[i] === '--mcts-sims') mctsSims = parseInt(args[++i]);
     else if (args[i] === '--mcts-determinizations') mctsDeterminizations = parseInt(args[++i]);
+    else if (args[i] === '--p1-policy') p1Policy = args[++i] as EvalPolicy;
+    else if (args[i] === '--p2-policy') p2Policy = args[++i] as EvalPolicy;
   }
-  return {numGames, numWorkers, output, policy, mctsSims, mctsDeterminizations};
+  return {numGames, numWorkers, output, policy, mctsSims, mctsDeterminizations, p1Policy, p2Policy};
 }
 
 /** Run games concurrently in-process (each game is async, so they interleave) */
@@ -62,15 +68,43 @@ async function runGamesInProcess(numGames: number, concurrency: number, policy: 
 
 async function main() {
   const config = parseArgs();
+  const evalMode = config.p1Policy !== undefined && config.p2Policy !== undefined;
+  const log = evalMode ? console.error.bind(console) : console.log.bind(console);
 
-  console.log(`Running ${config.numGames} games (concurrency: ${config.numWorkers}, policy: ${config.policy}${config.policy === 'mcts' ? `, sims: ${config.mctsSims}, dets: ${config.mctsDeterminizations}` : ''})...`);
+  const mctsConfig = {...DEFAULT_MCTS_CONFIG, numSimulations: config.mctsSims, numDeterminizations: config.mctsDeterminizations};
+
+  if (evalMode) {
+    log(`Eval: ${config.numGames} games, ${config.p1Policy} vs ${config.p2Policy} (concurrency: ${config.numWorkers})`);
+    const startTime = Date.now();
+    const results: GameResult[] = [];
+    let started = 0;
+
+    async function worker() {
+      while (started < config.numGames) {
+        started++;
+        try {
+          results.push(await playEvalGame(config.p1Policy!, config.p2Policy!, mctsConfig));
+        } catch {
+          // Game timed out — skip
+        }
+      }
+    }
+
+    await Promise.all(Array.from({length: config.numWorkers}, () => worker()));
+    const elapsed = (Date.now() - startTime) / 1000;
+    log(`Completed ${results.length} games in ${elapsed.toFixed(1)}s`);
+
+    const lines = results.map(r => JSON.stringify({winner: r.winner, numTurns: r.numTurns}));
+    writeFileSync(config.output, lines.join('\n') + '\n');
+    return;
+  }
+
+  log(`Running ${config.numGames} games (concurrency: ${config.numWorkers}, policy: ${config.policy}${config.policy === 'mcts' ? `, sims: ${config.mctsSims}, dets: ${config.mctsDeterminizations}` : ''})...`);
   const startTime = Date.now();
 
-  const mctsConfig = config.policy === 'mcts'
-    ? {...DEFAULT_MCTS_CONFIG, numSimulations: config.mctsSims, numDeterminizations: config.mctsDeterminizations}
-    : undefined;
+  const selfPlayMctsConfig = config.policy === 'mcts' ? mctsConfig : undefined;
 
-  const results = await runGamesInProcess(config.numGames, config.numWorkers, config.policy, mctsConfig);
+  const results = await runGamesInProcess(config.numGames, config.numWorkers, config.policy, selfPlayMctsConfig);
 
   const elapsed = (Date.now() - startTime) / 1000;
   const throughput = results.length / elapsed;

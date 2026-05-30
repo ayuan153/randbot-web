@@ -9,6 +9,7 @@ import {runMCTS, uniformPolicy, DEFAULT_MCTS_CONFIG} from '../mcts/ismcts.ts';
 import {heuristicValue} from '../mcts/heuristic-value.ts';
 import type {MCTSConfig} from '../mcts/ismcts.ts';
 import {BattleAdapter} from './battle-adapter.ts';
+import {randomPolicy, heuristicPolicy} from './policies.ts';
 
 // Register the random team generator
 Teams.setGeneratorFactory(TeamGenerators);
@@ -68,6 +69,7 @@ function pickRandomAction(request: any): string {
 }
 
 const GAME_TIMEOUT_MS = 30_000;
+const MAX_LOOP_ITERATIONS = 2000;
 
 export type PolicyType = 'random' | 'mcts';
 
@@ -108,7 +110,6 @@ async function runMCTSGameInternal(config: MCTSConfig): Promise<GameResult> {
   // that never clears). The async game timeout cannot fire while this loop
   // runs synchronously, so we need a hard iteration cap to avoid a hang.
   let loopGuard = 0;
-  const MAX_LOOP_ITERATIONS = 2000;
 
   while (!battle.ended) {
     if (++loopGuard > MAX_LOOP_ITERATIONS) break;
@@ -257,5 +258,97 @@ async function runGameInternal(): Promise<GameResult> {
     turns,
     winner: winner ?? 'p1',
     numTurns: currentTurn,
+  };
+}
+
+export type EvalPolicy = 'random' | 'heuristic' | 'mcts';
+
+/** Choose an action for a side given its policy and the current battle state */
+async function chooseForPolicy(
+  policy: EvalPolicy,
+  battle: Battle,
+  side: 'p1' | 'p2',
+  request: any,
+  config: MCTSConfig,
+): Promise<string> {
+  if (policy === 'random') return randomPolicy(request);
+  if (policy === 'heuristic') return heuristicPolicy(request);
+  // mcts
+  const adapter = new BattleAdapter(battle, side);
+  const legalActions = adapter.getLegalActions();
+  if (legalActions.length <= 1 && legalActions[0] === 'default') return 'default';
+  const policyFn = () => uniformPolicy(legalActions);
+  const result = await runMCTS(adapter, legalActions, policyFn, heuristicValue, config);
+  return result.bestAction;
+}
+
+/**
+ * Play a single eval game with independent policies per side.
+ * Used by Elo evaluation to pit policies head-to-head.
+ */
+export async function playEvalGame(
+  p1Policy: EvalPolicy,
+  p2Policy: EvalPolicy,
+  mctsConfig?: MCTSConfig,
+): Promise<GameResult> {
+  return Promise.race([
+    playEvalGameInternal(p1Policy, p2Policy, mctsConfig ?? DEFAULT_MCTS_CONFIG),
+    new Promise<GameResult>((_, reject) =>
+      setTimeout(() => reject(new Error('Game timed out')), GAME_TIMEOUT_MS)
+    ),
+  ]);
+}
+
+async function playEvalGameInternal(
+  p1Policy: EvalPolicy,
+  p2Policy: EvalPolicy,
+  config: MCTSConfig,
+): Promise<GameResult> {
+  const battle = new Battle({formatid: toID('gen9randombattle')});
+  battle.setPlayer('p1', {name: 'Bot1'});
+  battle.setPlayer('p2', {name: 'Bot2'});
+
+  let loopGuard = 0;
+
+  while (!battle.ended) {
+    if (++loopGuard > MAX_LOOP_ITERATIONS) break;
+
+    const p1Request = battle.p1.activeRequest;
+    const p2Request = battle.p2.activeRequest;
+
+    if (!p1Request && !p2Request) break;
+
+    const p1NeedsChoice = p1Request && !(p1Request as {wait?: boolean}).wait && !(p1Request as {teamPreview?: boolean}).teamPreview;
+    const p2NeedsChoice = p2Request && !(p2Request as {wait?: boolean}).wait && !(p2Request as {teamPreview?: boolean}).teamPreview;
+
+    if (!p1NeedsChoice && !p2NeedsChoice) {
+      if (p1Request) battle.choose('p1', 'default');
+      if (p2Request) battle.choose('p2', 'default');
+      continue;
+    }
+
+    let p1Choice = 'default';
+    let p2Choice = 'default';
+
+    if (p1NeedsChoice) {
+      p1Choice = await chooseForPolicy(p1Policy, battle, 'p1', p1Request, config);
+    }
+    if (p2NeedsChoice) {
+      p2Choice = await chooseForPolicy(p2Policy, battle, 'p2', p2Request, config);
+    }
+
+    if (p1NeedsChoice) battle.choose('p1', p1Choice);
+    if (p2NeedsChoice) battle.choose('p2', p2Choice);
+    if (!p1NeedsChoice && p1Request) battle.choose('p1', 'default');
+    if (!p2NeedsChoice && p2Request) battle.choose('p2', 'default');
+  }
+
+  const winner: 'p1' | 'p2' = battle.winner === 'Bot1' ? 'p1' : 'p2';
+
+  return {
+    log: '',
+    turns: [],
+    winner,
+    numTurns: battle.turn,
   };
 }
