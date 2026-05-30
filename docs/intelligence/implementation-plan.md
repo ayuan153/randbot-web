@@ -224,6 +224,38 @@ AWS (SageMaker/EC2 p5)
 - **Status / next:** Image at `randbats-training:latest` is correct (amd64 + artifact persistence).
   Real prerequisites for a useful run are the GPU/CUDA pin and MCTS wiring.
 
+### Validation run #3 — GPU + MCTS, full 5 iterations (2026-05-29)
+
+- **Both fixes landed and verified on SageMaker.** Job `randbats-alphazero-validation-20260529-1732`
+  ran to **Completed** (billable 1922s, ~32 min, ~$0.40) on ml.g4dn.xlarge with
+  `--environment NUM_ITERATIONS=5,NUM_GAMES=40,EPOCHS=10,NUM_WORKERS=4,POLICY=mcts,MCTS_SIMS=16`.
+- **GPU fix (b1):** torch pinned to `2.5.1+cu121` (+ cu121 `--extra-index-url`); logs now report
+  `Using device: cuda` (was CPU fallback under the cu13 build). Commit ab381a6.
+- **MCTS wiring (b2):** ISMCTS now drives self-play move selection (CloneableBattle adapter via
+  `@pkmn/sim` `toJSON`/`fromJSON`; uniform policy + neutral value evaluator; visit-count
+  distributions recorded as `p1Policy`/`p2Policy` and consumed as the trainer's policy target).
+  Configurable via `--policy`/`--mcts-sims`. Commits f3245cb, e563eb8, 18c2413.
+- **Two more bugs found and fixed during the run (both committed):**
+  - (1) ONNX export crashed with a cuda/cpu device mismatch once training used the GPU — fixed by
+    moving the model to CPU before `torch.onnx.export` (commit 6359393).
+  - (2) The MCTS game loop could hang forever on a non-progressing `wait`/`teamPreview` request
+    (the async per-game timeout can't fire while JS runs synchronously) — fixed with a hard
+    loop-iteration guard (commit 45cc54c).
+- **Output retrieved + verified:** `model.tar.gz` (4.4 MB) contains `iter_1..5.onnx` +
+  `checkpoint.pt`; onnxruntime loads `iter_5.onnx` with input `features[batch,20]`, outputs
+  `policy[batch,10]` + `value[batch,1]`.
+- **Tractability note:** MCTS self-play is CPU-bound/serial (~7s/game at sims=16 on g4dn), so
+  games per iteration were reduced from 1000 to 40 to fit the 2-hour cap. A 100-game run was
+  stopped for being too slow.
+- **Still TODO before a meaningful/production run:**
+  - (a) The MCTS evaluator is uniform-policy + neutral-value (AlphaZero cold start) so visit
+    distributions are near-uniform and not yet stronger than random — feed the trained net back
+    as `policyFn`/`valueFn` (and/or add a heuristic value) for real improvement.
+  - (b) Speed up MCTS self-play (`worker_threads` / lower sims / batched inference) since it is
+    far slower than random.
+  - (c) The self-play net is 20-feature and NOT compatible with the browser's 206-feature v1
+    model — do not drop it into `learned-eval.ts` as-is. v1 model remains untouched.
+
 ---
 
 ## Phase 3: Exploitation + Endgame Solving (2-3 months) — FUTURE
