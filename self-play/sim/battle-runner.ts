@@ -5,7 +5,8 @@
 
 import {Battle, BattleStreams, Teams, toID} from '@pkmn/sim';
 import {TeamGenerators} from '@pkmn/randoms';
-import {runMCTS, uniformPolicy, neutralValue, DEFAULT_MCTS_CONFIG} from '../mcts/ismcts.ts';
+import {runMCTS, uniformPolicy, DEFAULT_MCTS_CONFIG} from '../mcts/ismcts.ts';
+import {heuristicValue} from '../mcts/heuristic-value.ts';
 import type {MCTSConfig} from '../mcts/ismcts.ts';
 import {BattleAdapter} from './battle-adapter.ts';
 
@@ -138,7 +139,7 @@ async function runMCTSGameInternal(config: MCTSConfig): Promise<GameResult> {
       const legalActions = adapter.getLegalActions();
       if (legalActions.length > 1 || legalActions[0] !== 'default') {
         const policyFn = () => uniformPolicy(legalActions);
-        const result = await runMCTS(adapter, legalActions, policyFn, neutralValue, config);
+        const result = await runMCTS(adapter, legalActions, policyFn, heuristicValue, config);
         p1Choice = result.bestAction;
         p1Policy = Object.fromEntries(result.actionProbs);
       }
@@ -149,7 +150,7 @@ async function runMCTSGameInternal(config: MCTSConfig): Promise<GameResult> {
       const legalActions = adapter.getLegalActions();
       if (legalActions.length > 1 || legalActions[0] !== 'default') {
         const policyFn = () => uniformPolicy(legalActions);
-        const result = await runMCTS(adapter, legalActions, policyFn, neutralValue, config);
+        const result = await runMCTS(adapter, legalActions, policyFn, heuristicValue, config);
         p2Choice = result.bestAction;
         p2Policy = Object.fromEntries(result.actionProbs);
       }
