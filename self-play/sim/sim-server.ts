@@ -92,8 +92,15 @@ async function main() {
     const elapsed = (Date.now() - startTime) / 1000;
     log(`Completed ${results.length} games in ${elapsed.toFixed(1)}s`);
 
-    const lines = results.map(r => JSON.stringify({winner: r.winner, numTurns: r.numTurns}));
-    writeFileSync(config.output, lines.join('\n') + '\n');
+    const out = results.map(r => JSON.stringify({winner: r.winner, numTurns: r.numTurns})).join('\n') + '\n';
+    // Write fd 1 directly for stdout: re-opening '/dev/stdout' via writeFileSync
+    // throws EINVAL when stdout is a pipe on Linux (works on macOS), which
+    // crashed eval on SageMaker and yielded 0 parsed games.
+    if (config.output === '/dev/stdout' || config.output === '-') {
+      process.stdout.write(out);
+    } else {
+      writeFileSync(config.output, out);
+    }
     return;
   }
 

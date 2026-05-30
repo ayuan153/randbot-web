@@ -47,11 +47,13 @@ def play_matches(model_path: str | None, baseline: str, num_games: int = 100,
                     draws += 1
             except json.JSONDecodeError:
                 continue
+        if wins + losses + draws == 0:
+            print(f"Warning: 0 games parsed (rc={result.returncode}); "
+                  f"stderr tail: {result.stderr.strip()[-800:]}")
         return {'wins': wins, 'losses': losses, 'draws': draws}
     except (subprocess.TimeoutExpired, FileNotFoundError) as e:
         print(f"Warning: match execution failed: {e}")
         return {'wins': 0, 'losses': 0, 'draws': 0}
-
 
 def track_elo(model_path: str | None, num_games: int = 200, mcts_sims: int = 16) -> dict:
     """Run Elo evaluation for a model against baselines."""
