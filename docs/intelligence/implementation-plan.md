@@ -35,6 +35,30 @@ A phased roadmap to evolve randbats-bot from a heuristic depth-2 searcher (~1000
   value → near-random play) and there is no strength signal. Add a heuristic value + wire Elo eval,
   then confirm Elo climbs across iterations — before scaling games/features/compute.
 
+### Latest (2026-05-30) — Tier 0 complete: loop closed + Elo wired + validated
+
+- **Heuristic value signal:** MCTS now evaluates leaves with `mcts/heuristic-value.ts` (HP-fraction
+  differential, 0..1 from p1's perspective) instead of the constant `neutralValue` — real signal.
+- **Elo eval wired in:** `sim-server.ts` takes `--p1-policy/--p2-policy` (random/heuristic/mcts) and
+  `run.sh` runs `elo_tracker.py` after each iteration, logging a greppable `[Elo] vs_random=… …` line.
+- **Validation run** `randbats-alphazero-tier0-20260530-1004` → **Completed** (~56 min, GPU + MCTS,
+  5 iterations; `model.tar.gz` has `iter_1..5.onnx` + `checkpoint.pt` + `elo_iter_1..5.json`).
+  Per-iteration Elo vs the `random` baseline: **920 → 870 → 912 → 1041 → 1041** — the MCTS+heuristic
+  agent beats random every iteration (65–80% win rate), and final (1041) ≥ first (920). Acceptance met.
+- **Caveat (by design):** Tier 0 does **not** feed the trained net back into MCTS, so the eval agent
+  is identical each iteration — Elo is positive/stable, not monotonically climbing. The upward trend
+  here is partly noise; a genuine learning curve needs net-feedback (next).
+- **Bugs fixed en route** (all SageMaker-only, since the eval works locally): eval crashed with
+  `Cannot find package 'tsx'` because `elo_tracker.py` assumed the dev layout (`training/` nested in
+  `self-play/`) but the image puts `training/` and the sim/`node_modules` as siblings under `/app`
+  (now probes both); also serial eval (CPU-bound MCTS gains nothing from concurrency and was timing
+  out under 4× contention), a cleared per-game timeout (dangling timer hung the process), and writing
+  eval JSONL via `process.stdout.write` instead of `/dev/stdout` (EINVAL on a Linux pipe).
+- **Next (completes "close the loop"):** feed the previous iteration's ONNX back as `policyFn`/
+  `valueFn` (true AlphaZero) — needs a TS 20-feature extractor mirroring the Python trainer,
+  onnxruntime-node inference in `battle-runner.ts`, and a `--net` arg threaded through. Then Elo
+  should climb across iterations. (Throughput = Tier 1; feature unification = Tier 2.)
+
 ### Key Decision
 
 **`@pkmn/engine` only supports Gen 1.** It cannot be used for Gen 9 Random Battles. The original Phase 1 (faster search via @pkmn/engine WASM) is blocked.

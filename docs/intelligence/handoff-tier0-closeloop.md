@@ -1,5 +1,13 @@
 # Handoff — Tier 0: Close the MCTS Loop + Wire Elo
 
+> **✅ STATUS: COMPLETE (2026-05-30).** Done on `main` (commits `08ecabe`, `e0969b5`, `a654819`,
+> `1d1830a`, `6e714d7`, `c200ddb`). Validating run `randbats-alphazero-tier0-20260530-1004` →
+> **Completed**, GPU + MCTS, 5 iterations; per-iteration Elo vs `random`: 920 → 870 → 912 → 1041 →
+> 1041 (final ≥ first, positive — acceptance met). `model.tar.gz` has `iter_1..5.onnx` +
+> `checkpoint.pt` + `elo_iter_1..5.json`. **Next:** feed the prev iteration's ONNX back into MCTS as
+> `policyFn`/`valueFn` (true AlphaZero) so Elo actually climbs — see implementation-plan.md
+> "Latest (2026-05-30)". The task description below is kept for reference.
+
 **For:** a fresh agent picking up the self-play RL track.
 **Read first:** [`self-play-rl-design.md`](./self-play-rl-design.md) (architecture + limitations) and the
 "Roadmap — Self-Play Scaling" section of [`implementation-plan.md`](./implementation-plan.md).
