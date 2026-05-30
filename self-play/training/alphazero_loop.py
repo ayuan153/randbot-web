@@ -327,6 +327,7 @@ def train_model(
 
 def export_onnx(model: PolicyValueNet, output_path: str, input_dim: int = 245) -> None:
     """Export trained model to ONNX format for browser inference."""
+    model = model.to("cpu")
     model.eval()
     dummy_input = torch.randn(1, input_dim)
 
