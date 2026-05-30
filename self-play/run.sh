@@ -46,12 +46,14 @@ for i in $(seq 1 $NUM_ITERATIONS); do
     # 1. Self-play
     echo "Running $NUM_GAMES self-play games..."
     cd "$SELF_PLAY_DIR"
+    if [ "$i" -gt 1 ]; then NET_ARG="--net $OUTPUT_DIR/models/iter_$((i-1)).onnx"; else NET_ARG=""; fi
     node --import tsx sim/sim-server.ts \
         --games "$NUM_GAMES" \
         --workers "$NUM_WORKERS" \
         --output "$OUTPUT_DIR/games/iter_${i}.jsonl" \
         --policy "$POLICY" \
-        --mcts-sims "$MCTS_SIMS"
+        --mcts-sims "$MCTS_SIMS" \
+        $NET_ARG
 
     # 2. Train
     echo "Training on collected games..."
@@ -72,6 +74,7 @@ for i in $(seq 1 $NUM_ITERATIONS); do
     if [ "$RUN_ELO" = "1" ]; then
         echo "=== Iteration $i: Elo eval (mcts vs random/heuristic) ==="
         python3 "$ELO_SCRIPT" --model mcts --games "$ELO_GAMES" --mcts-sims "$MCTS_SIMS" \
+            --net "$OUTPUT_DIR/models/iter_${i}.onnx" \
             --output "$OUTPUT_DIR/models/elo_iter_${i}.json" || echo "WARN: Elo eval failed (non-fatal)"
     fi
 

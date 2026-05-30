@@ -8,14 +8,15 @@
     "test": "node --import tsx sim/sim-server.ts --games 10 --workers 2"
   },
   "dependencies": {
-    "@pkmn/sim": "latest",
-    "@pkmn/dex": "latest",
     "@pkmn/data": "latest",
-    "@pkmn/randoms": "latest"
+    "@pkmn/dex": "latest",
+    "@pkmn/randoms": "latest",
+    "@pkmn/sim": "latest",
+    "onnxruntime-node": "^1.26.0"
   },
   "devDependencies": {
-    "typescript": "^5.0",
+    "@types/node": "^20.0",
     "tsx": "^4.0",
-    "@types/node": "^20.0"
+    "typescript": "^5.0"
   }
 }

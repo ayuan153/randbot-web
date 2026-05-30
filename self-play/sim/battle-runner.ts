@@ -8,6 +8,8 @@ import {TeamGenerators} from '@pkmn/randoms';
 import {runMCTS, uniformPolicy, DEFAULT_MCTS_CONFIG} from '../mcts/ismcts.ts';
 import {heuristicValue} from '../mcts/heuristic-value.ts';
 import type {MCTSConfig} from '../mcts/ismcts.ts';
+import type {InferenceSession} from 'onnxruntime-node';
+import {netPolicyFn, netValueFn} from '../mcts/net-eval.ts';
 import {BattleAdapter} from './battle-adapter.ts';
 import {randomPolicy, heuristicPolicy} from './policies.ts';
 
@@ -81,24 +83,25 @@ export type PolicyType = 'random' | 'mcts';
 export async function playGame(
   policy: PolicyType = 'random',
   mctsConfig?: MCTSConfig,
+  net?: InferenceSession,
 ): Promise<GameResult> {
   if (policy === 'mcts') {
-    return runMCTSGame(mctsConfig ?? DEFAULT_MCTS_CONFIG);
+    return runMCTSGame(mctsConfig ?? DEFAULT_MCTS_CONFIG, net);
   }
   return runGame();
 }
 
 /** Run a single game using ISMCTS for both players' decisions */
-async function runMCTSGame(config: MCTSConfig): Promise<GameResult> {
+async function runMCTSGame(config: MCTSConfig, net?: InferenceSession): Promise<GameResult> {
   return Promise.race([
-    runMCTSGameInternal(config),
+    runMCTSGameInternal(config, net),
     new Promise<GameResult>((_, reject) =>
       setTimeout(() => reject(new Error('Game timed out')), GAME_TIMEOUT_MS)
     ),
   ]);
 }
 
-async function runMCTSGameInternal(config: MCTSConfig): Promise<GameResult> {
+async function runMCTSGameInternal(config: MCTSConfig, net?: InferenceSession): Promise<GameResult> {
   const battle = new Battle({formatid: toID('gen9randombattle')});
   battle.setPlayer('p1', {name: 'Bot1'});
   battle.setPlayer('p2', {name: 'Bot2'});
@@ -139,8 +142,9 @@ async function runMCTSGameInternal(config: MCTSConfig): Promise<GameResult> {
       const adapter = new BattleAdapter(battle, 'p1');
       const legalActions = adapter.getLegalActions();
       if (legalActions.length > 1 || legalActions[0] !== 'default') {
-        const policyFn = () => uniformPolicy(legalActions);
-        const result = await runMCTS(adapter, legalActions, policyFn, heuristicValue, config);
+        const policyFn = net ? netPolicyFn(net, 'p1') : () => uniformPolicy(legalActions);
+        const valueFn = net ? netValueFn(net) : heuristicValue;
+        const result = await runMCTS(adapter, legalActions, policyFn, valueFn, config);
         p1Choice = result.bestAction;
         p1Policy = Object.fromEntries(result.actionProbs);
       }
@@ -150,8 +154,9 @@ async function runMCTSGameInternal(config: MCTSConfig): Promise<GameResult> {
       const adapter = new BattleAdapter(battle, 'p2');
       const legalActions = adapter.getLegalActions();
       if (legalActions.length > 1 || legalActions[0] !== 'default') {
-        const policyFn = () => uniformPolicy(legalActions);
-        const result = await runMCTS(adapter, legalActions, policyFn, heuristicValue, config);
+        const policyFn = net ? netPolicyFn(net, 'p2') : () => uniformPolicy(legalActions);
+        const valueFn = net ? netValueFn(net) : heuristicValue;
+        const result = await runMCTS(adapter, legalActions, policyFn, valueFn, config);
         p2Choice = result.bestAction;
         p2Policy = Object.fromEntries(result.actionProbs);
       }
@@ -270,6 +275,7 @@ async function chooseForPolicy(
   side: 'p1' | 'p2',
   request: any,
   config: MCTSConfig,
+  net?: InferenceSession,
 ): Promise<string> {
   if (policy === 'random') return randomPolicy(request);
   if (policy === 'heuristic') return heuristicPolicy(request);
@@ -277,8 +283,9 @@ async function chooseForPolicy(
   const adapter = new BattleAdapter(battle, side);
   const legalActions = adapter.getLegalActions();
   if (legalActions.length <= 1 && legalActions[0] === 'default') return 'default';
-  const policyFn = () => uniformPolicy(legalActions);
-  const result = await runMCTS(adapter, legalActions, policyFn, heuristicValue, config);
+  const policyFn = net ? netPolicyFn(net, side) : () => uniformPolicy(legalActions);
+  const valueFn = net ? netValueFn(net) : heuristicValue;
+  const result = await runMCTS(adapter, legalActions, policyFn, valueFn, config);
   return result.bestAction;
 }
 
@@ -290,11 +297,12 @@ export async function playEvalGame(
   p1Policy: EvalPolicy,
   p2Policy: EvalPolicy,
   mctsConfig?: MCTSConfig,
+  net?: InferenceSession,
 ): Promise<GameResult> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([
-      playEvalGameInternal(p1Policy, p2Policy, mctsConfig ?? DEFAULT_MCTS_CONFIG),
+      playEvalGameInternal(p1Policy, p2Policy, mctsConfig ?? DEFAULT_MCTS_CONFIG, net),
       new Promise<GameResult>((_, reject) => {
         timer = setTimeout(() => reject(new Error('Game timed out')), GAME_TIMEOUT_MS);
       }),
@@ -310,6 +318,7 @@ async function playEvalGameInternal(
   p1Policy: EvalPolicy,
   p2Policy: EvalPolicy,
   config: MCTSConfig,
+  net?: InferenceSession,
 ): Promise<GameResult> {
   const battle = new Battle({formatid: toID('gen9randombattle')});
   battle.setPlayer('p1', {name: 'Bot1'});
@@ -338,10 +347,10 @@ async function playEvalGameInternal(
     let p2Choice = 'default';
 
     if (p1NeedsChoice) {
-      p1Choice = await chooseForPolicy(p1Policy, battle, 'p1', p1Request, config);
+      p1Choice = await chooseForPolicy(p1Policy, battle, 'p1', p1Request, config, net);
     }
     if (p2NeedsChoice) {
-      p2Choice = await chooseForPolicy(p2Policy, battle, 'p2', p2Request, config);
+      p2Choice = await chooseForPolicy(p2Policy, battle, 'p2', p2Request, config, net);
     }
 
     if (p1NeedsChoice) battle.choose('p1', p1Choice);

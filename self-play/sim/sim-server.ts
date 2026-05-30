@@ -6,6 +6,8 @@
 import {writeFileSync} from 'node:fs';
 import {playGame, playEvalGame, type GameResult, type PolicyType, type EvalPolicy} from './battle-runner.ts';
 import {DEFAULT_MCTS_CONFIG, type MCTSConfig} from '../mcts/ismcts.ts';
+import {loadNet} from '../mcts/net-eval.ts';
+import type {InferenceSession} from 'onnxruntime-node';
 
 interface Config {
   numGames: number;
@@ -16,6 +18,7 @@ interface Config {
   mctsDeterminizations: number;
   p1Policy?: EvalPolicy;
   p2Policy?: EvalPolicy;
+  net?: string;
 }
 
 function parseArgs(): Config {
@@ -28,6 +31,7 @@ function parseArgs(): Config {
   let mctsDeterminizations = 5;
   let p1Policy: EvalPolicy | undefined;
   let p2Policy: EvalPolicy | undefined;
+  let net: string | undefined;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--games') numGames = parseInt(args[++i]);
@@ -38,12 +42,13 @@ function parseArgs(): Config {
     else if (args[i] === '--mcts-determinizations') mctsDeterminizations = parseInt(args[++i]);
     else if (args[i] === '--p1-policy') p1Policy = args[++i] as EvalPolicy;
     else if (args[i] === '--p2-policy') p2Policy = args[++i] as EvalPolicy;
+    else if (args[i] === '--net') net = args[++i];
   }
-  return {numGames, numWorkers, output, policy, mctsSims, mctsDeterminizations, p1Policy, p2Policy};
+  return {numGames, numWorkers, output, policy, mctsSims, mctsDeterminizations, p1Policy, p2Policy, net};
 }
 
 /** Run games concurrently in-process (each game is async, so they interleave) */
-async function runGamesInProcess(numGames: number, concurrency: number, policy: PolicyType, mctsConfig?: MCTSConfig): Promise<GameResult[]> {
+async function runGamesInProcess(numGames: number, concurrency: number, policy: PolicyType, mctsConfig?: MCTSConfig, net?: InferenceSession): Promise<GameResult[]> {
   const results: GameResult[] = [];
   let started = 0;
   let timeouts = 0;
@@ -52,7 +57,7 @@ async function runGamesInProcess(numGames: number, concurrency: number, policy: 
     while (started < numGames) {
       started++;
       try {
-        results.push(await playGame(policy, mctsConfig));
+        results.push(await playGame(policy, mctsConfig, net));
       } catch {
         // Game timed out or errored — skip it and try another
         timeouts++;
@@ -71,6 +76,18 @@ async function main() {
   const evalMode = config.p1Policy !== undefined && config.p2Policy !== undefined;
   const log = evalMode ? console.error.bind(console) : console.log.bind(console);
 
+  // Load ONNX net once (non-fatal on failure)
+  let net: InferenceSession | undefined;
+  if (config.net) {
+    try {
+      net = await loadNet(config.net);
+      log('loaded net: ' + config.net);
+    } catch (e) {
+      log('WARN net load failed, falling back: ' + e);
+      net = undefined;
+    }
+  }
+
   const mctsConfig = {...DEFAULT_MCTS_CONFIG, numSimulations: config.mctsSims, numDeterminizations: config.mctsDeterminizations};
 
   if (evalMode) {
@@ -84,7 +101,7 @@ async function main() {
     // contention every game timed out on SageMaker, yielding 0 scored games.
     for (let g = 0; g < config.numGames; g++) {
       try {
-        results.push(await playEvalGame(config.p1Policy!, config.p2Policy!, mctsConfig));
+        results.push(await playEvalGame(config.p1Policy!, config.p2Policy!, mctsConfig, net));
       } catch {
         // Game timed out — skip
       }
@@ -109,7 +126,7 @@ async function main() {
 
   const selfPlayMctsConfig = config.policy === 'mcts' ? mctsConfig : undefined;
 
-  const results = await runGamesInProcess(config.numGames, config.numWorkers, config.policy, selfPlayMctsConfig);
+  const results = await runGamesInProcess(config.numGames, config.numWorkers, config.policy, selfPlayMctsConfig, net);
 
   const elapsed = (Date.now() - startTime) / 1000;
   const throughput = results.length / elapsed;
