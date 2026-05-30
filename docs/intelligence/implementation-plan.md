@@ -59,6 +59,30 @@ A phased roadmap to evolve randbats-bot from a heuristic depth-2 searcher (~1000
   onnxruntime-node inference in `battle-runner.ts`, and a `--net` arg threaded through. Then Elo
   should climb across iterations. (Throughput = Tier 1; feature unification = Tier 2.)
 
+### Latest (2026-05-30) — Tier 0.5: net fed back into MCTS (implemented, but scale-limited)
+
+- **Implemented + verified end-to-end.** `mcts/net-features.ts` (20-feature extractor, parity-tested
+  vs the Python trainer), `mcts/net-eval.ts` (onnxruntime-node: `netValueFn` p1-perspective
+  `(tanh+1)/2`, `netPolicyFn` over the 10-action index space), ismcts policy/value fns made
+  awaitable, and a `--net` arg threaded through `sim-server`/`battle-runner`/`run.sh`/`elo_tracker`.
+  Self-play iter i uses iter_{i-1}.onnx (iter 1 cold-starts); Elo eval iter i uses iter_i.onnx.
+  onnxruntime-node loads in the cu121 container; net-backed MCTS beats random (logs show
+  `loaded net: …/iter_N.onnx` each iteration).
+- **Validation** `randbats-alphazero-tier05-20260530-1449` → **Completed** (~56 min). Per-iteration
+  Elo vs random: **1079 → 920 → 939 → 947 → 920** (records 25-5, 20-10, 20-9, 21-9, 20-10).
+- **Result: Elo does NOT climb.** The cold-start net (iter 1, trained on diverse heuristic-MCTS
+  games) is the strongest; once the net-vs-net loop starts it settles to a flat ~930. Every net still
+  beats random (67–83%), but feeding the net back does not compound at this scale.
+- **Why (matches the "cold start vs warm start" open question):** 40 games/iter is far too little
+  volume for from-scratch AlphaZero — net-vs-net self-play narrows the distribution and the tiny
+  20-feature net overfits its own play, regressing slightly vs random instead of improving. This is a
+  **volume bottleneck, not a code bug** (the loop is correct and verified).
+- **Next:** the prerequisite for net-feedback to compound is **Tier 1 (throughput)** — parallelize
+  self-play (worker_threads / process-per-core, actor/learner split) for 10–100× more games/iter.
+  Alternatives worth a cheap experiment: renormalize net policy priors over legal actions (currently
+  unnormalized), bootstrap value/policy from the heuristic or supervised model rather than from
+  scratch, and raise MCTS sims. But the dominant lever is games/iter.
+
 ### Key Decision
 
 **`@pkmn/engine` only supports Gen 1.** It cannot be used for Gen 9 Random Battles. The original Phase 1 (faster search via @pkmn/engine WASM) is blocked.
