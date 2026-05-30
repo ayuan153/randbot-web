@@ -13,15 +13,15 @@ describe('heuristicValue', () => {
     expect(heuristicValue(mk([80, 80], [80, 80]))).toBeCloseTo(0.5);
   });
 
-  it('returns clamped low value when p1 is wiped', () => {
+  it('clamps to lower bound when p1 is wiped', () => {
     const v = heuristicValue(mk([0, 0, 0], [100, 100, 100]));
     expect(v).toBeLessThan(0.5);
-    expect(v).toBeLessThanOrEqual(0.99);
+    expect(v).toBeCloseTo(0.01);
   });
 
-  it('clamps upper bound when p2 is wiped', () => {
+  it('clamps to upper bound when p2 is wiped', () => {
     const v = heuristicValue(mk([100, 100, 100], [0, 0, 0]));
-    expect(v).toBeLessThanOrEqual(0.99);
     expect(v).toBeGreaterThan(0.5);
+    expect(v).toBeCloseTo(0.99);
   });
 });

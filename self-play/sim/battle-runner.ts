@@ -27,7 +27,7 @@ export interface TurnRecord {
 export interface GameResult {
   log: string;
   turns: TurnRecord[];
-  winner: 'p1' | 'p2';
+  winner: 'p1' | 'p2' | 'draw';
   numTurns: number;
 }
 
@@ -343,7 +343,10 @@ async function playEvalGameInternal(
     if (!p2NeedsChoice && p2Request) battle.choose('p2', 'default');
   }
 
-  const winner: 'p1' | 'p2' = battle.winner === 'Bot1' ? 'p1' : 'p2';
+  // Non-decisive games (loop-guard break / no winner) are draws, not p2 wins,
+  // so they don't bias the Elo of the agent under test (always p1 in eval).
+  const winner: 'p1' | 'p2' | 'draw' =
+    battle.winner === 'Bot1' ? 'p1' : battle.winner === 'Bot2' ? 'p2' : 'draw';
 
   return {
     log: '',
