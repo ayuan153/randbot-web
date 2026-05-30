@@ -103,7 +103,15 @@ async function runMCTSGameInternal(config: MCTSConfig): Promise<GameResult> {
   const turns: TurnRecord[] = [];
   let turnNum = 0;
 
+  // Guard against pathological non-progressing battles (e.g. a wait request
+  // that never clears). The async game timeout cannot fire while this loop
+  // runs synchronously, so we need a hard iteration cap to avoid a hang.
+  let loopGuard = 0;
+  const MAX_LOOP_ITERATIONS = 2000;
+
   while (!battle.ended) {
+    if (++loopGuard > MAX_LOOP_ITERATIONS) break;
+
     const p1Request = battle.p1.activeRequest;
     const p2Request = battle.p2.activeRequest;
 
