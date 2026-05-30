@@ -31,10 +31,10 @@ export interface MCTSNode {
 }
 
 /** Function that returns prior probabilities over legal actions */
-export type PolicyFn = (state: unknown) => Map<string, number>;
+export type PolicyFn = (state: unknown) => Map<string, number> | Promise<Map<string, number>>;
 
 /** Function that returns a win probability estimate for the current player */
-export type ValueFn = (state: unknown) => number;
+export type ValueFn = (state: unknown) => number | Promise<number>;
 
 /**
  * Interface for a battle state that can be cloned and advanced.
@@ -140,13 +140,13 @@ function backup(node: MCTSNode, value: number): void {
  * Run one MCTS iteration on a determinized battle state.
  * Select → Expand → Evaluate → Backup
  */
-function mctsIteration(
+async function mctsIteration(
   root: MCTSNode,
   battle: CloneableBattle,
   policyFn: PolicyFn,
   valueFn: ValueFn,
   cPuct: number,
-): void {
+): Promise<void> {
   let node = root;
   const sim = battle.clone();
 
@@ -168,11 +168,11 @@ function mctsIteration(
 
   // EXPAND: create children with policy priors
   const legalActions = sim.getLegalActions();
-  const priors = policyFn(sim.getState());
+  const priors = await policyFn(sim.getState());
   expandNode(node, legalActions, priors);
 
   // EVALUATE: get value estimate from value function
-  const value = valueFn(sim.getState());
+  const value = await valueFn(sim.getState());
 
   // BACKUP
   backup(node, value);
@@ -210,13 +210,13 @@ export async function runMCTS(
     const determinized = determinizeFn ? determinizeFn(battle) : battle.clone();
 
     // Create a fresh root for this determinization
-    const priors = policyFn(determinized.getState());
+    const priors = await policyFn(determinized.getState());
     const root = createNode(null, 0);
     expandNode(root, legalActions, priors);
 
     // Run MCTS iterations
     for (let i = 0; i < simsPerDeterminization; i++) {
-      mctsIteration(root, determinized, policyFn, valueFn, explorationConstant);
+      await mctsIteration(root, determinized, policyFn, valueFn, explorationConstant);
     }
 
     // Accumulate visit counts

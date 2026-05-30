@@ -1,0 +1,299 @@
+[
+  {
+    "request": {
+      "side": {
+        "pokemon": [
+          {
+            "condition": "100/100",
+            "active": true
+          },
+          {
+            "condition": "100/100",
+            "active": false
+          },
+          {
+            "condition": "100/100",
+            "active": false
+          },
+          {
+            "condition": "100/100",
+            "active": false
+          },
+          {
+            "condition": "100/100",
+            "active": false
+          },
+          {
+            "condition": "100/100",
+            "active": false
+          }
+        ]
+      },
+      "active": [
+        {
+          "moves": [
+            {
+              "id": "m1"
+            },
+            {
+              "id": "m2"
+            },
+            {
+              "id": "m3"
+            },
+            {
+              "id": "m4"
+            }
+          ]
+        }
+      ]
+    },
+    "oppRequest": {
+      "side": {
+        "pokemon": [
+          {
+            "condition": "250/250",
+            "active": true
+          },
+          {
+            "condition": "250/250",
+            "active": false
+          },
+          {
+            "condition": "250/250",
+            "active": false
+          },
+          {
+            "condition": "250/250",
+            "active": false
+          },
+          {
+            "condition": "250/250",
+            "active": false
+          },
+          {
+            "condition": "250/250",
+            "active": false
+          }
+        ]
+      }
+    },
+    "turn": 1,
+    "expected": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      0.01,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "request": {
+      "side": {
+        "pokemon": [
+          {
+            "condition": "0 fnt",
+            "active": false
+          },
+          {
+            "condition": "55/100 brn",
+            "active": false
+          },
+          {
+            "condition": "120/300",
+            "active": true
+          },
+          {
+            "condition": "100/100",
+            "active": false
+          },
+          {
+            "condition": "0 fnt",
+            "active": false
+          },
+          {
+            "condition": "80/200",
+            "active": false
+          }
+        ]
+      },
+      "active": [
+        {
+          "moves": [
+            {
+              "id": "a",
+              "disabled": true
+            },
+            {
+              "id": "b"
+            },
+            {
+              "id": "c"
+            }
+          ]
+        }
+      ]
+    },
+    "oppRequest": {
+      "side": {
+        "pokemon": [
+          {
+            "condition": "200/200",
+            "active": true
+          },
+          {
+            "condition": "0 fnt",
+            "active": false
+          },
+          {
+            "condition": "10/250",
+            "active": false
+          },
+          {
+            "condition": "250/250",
+            "active": false
+          },
+          {
+            "condition": "250/250",
+            "active": false
+          },
+          {
+            "condition": "250/250",
+            "active": false
+          }
+        ]
+      }
+    },
+    "turn": 30,
+    "expected": [
+      0.0,
+      0.55,
+      0.4,
+      1.0,
+      0.0,
+      0.4,
+      1.0,
+      0.0,
+      0.04,
+      1.0,
+      1.0,
+      1.0,
+      0.666667,
+      0.833333,
+      0.4,
+      1.0,
+      0.5,
+      0.3,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "request": {
+      "side": {
+        "pokemon": [
+          {
+            "condition": "0 fnt",
+            "active": true
+          },
+          {
+            "condition": "90/100",
+            "active": false
+          },
+          {
+            "condition": "100/100",
+            "active": false
+          },
+          {
+            "condition": "0 fnt",
+            "active": false
+          },
+          {
+            "condition": "50/100",
+            "active": false
+          },
+          {
+            "condition": "100/100",
+            "active": false
+          }
+        ]
+      },
+      "active": [
+        {
+          "moves": []
+        }
+      ],
+      "forceSwitch": [
+        true
+      ]
+    },
+    "oppRequest": {
+      "side": {
+        "pokemon": [
+          {
+            "condition": "100/100",
+            "active": true
+          },
+          {
+            "condition": "0 fnt",
+            "active": false
+          },
+          {
+            "condition": "0 fnt",
+            "active": false
+          },
+          {
+            "condition": "0 fnt",
+            "active": false
+          },
+          {
+            "condition": "0 fnt",
+            "active": false
+          },
+          {
+            "condition": "0 fnt",
+            "active": false
+          }
+        ]
+      }
+    },
+    "turn": 50,
+    "expected": [
+      0.0,
+      0.9,
+      1.0,
+      0.0,
+      0.5,
+      1.0,
+      1.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.666667,
+      0.166667,
+      0.0,
+      1.0,
+      0.0,
+      0.5,
+      1.0,
+      0.0
+    ]
+  }
+]
