@@ -3,6 +3,21 @@ import subprocess, json, argparse, math
 from pathlib import Path
 
 
+def _self_play_dir() -> Path:
+    """Locate the dir holding sim/sim-server.ts + node_modules. The dev repo
+    nests training/ inside self-play/, but the Docker image copies training/ to
+    /app/training and the sim + node_modules to /app/self-play (siblings), so
+    __file__.parent.parent is wrong there — probe both layouts."""
+    here = Path(__file__).resolve()
+    for cand in (here.parent.parent, Path('/app/self-play'), here.parent.parent / 'self-play'):
+        if (cand / 'sim' / 'sim-server.ts').exists():
+            return cand
+    return here.parent.parent
+
+
+SELF_PLAY_DIR = _self_play_dir()
+
+
 def compute_elo(wins: int, losses: int, draws: int = 0, opponent_elo: int = 1000) -> float:
     """Compute Elo from win/loss record against a known-Elo opponent."""
     total = wins + losses + draws
@@ -21,7 +36,7 @@ def play_matches(model_path: str | None, baseline: str, num_games: int = 100,
     """Play model vs baseline using the sim server. Returns {wins, losses, draws}."""
     cmd = [
         'node', '--import', 'tsx',
-        str(Path(__file__).resolve().parent.parent / 'sim' / 'sim-server.ts'),
+        str(SELF_PLAY_DIR / 'sim' / 'sim-server.ts'),
         '--games', str(num_games),
         '--workers', '4',
         '--output', '/dev/stdout',
@@ -31,7 +46,7 @@ def play_matches(model_path: str | None, baseline: str, num_games: int = 100,
     ]
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=600,
-                                cwd=str(Path(__file__).resolve().parent.parent))
+                                cwd=str(SELF_PLAY_DIR))
         # Parse JSONL output — each line has {winner, numTurns, ...}
         wins = losses = draws = 0
         for line in result.stdout.strip().split('\n'):
