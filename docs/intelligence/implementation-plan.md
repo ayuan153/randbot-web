@@ -22,6 +22,19 @@ A phased roadmap to evolve randbats-bot from a heuristic depth-2 searcher (~1000
 - Features include speed, type matchup, turns-to-KO, setup/stall detection
 - Pivoting to self-play training (AlphaZero-style) for next improvement
 
+### Latest (2026-05-29)
+
+- **Self-play (AlphaZero) pipeline is validated end-to-end on AWS SageMaker** (GPU + ISMCTS,
+  5 iterations, retrievable ONNX). See Phase 2 → "Validation run #3" below.
+- **Shipped browser bot is unchanged** — the self-play net is 20-feature and not compatible with
+  the browser's 245-feature `learned-eval.ts`; v1 model is untouched.
+- **Next work is the self-play track, not the browser.** See the new roadmap and docs:
+  - `docs/intelligence/self-play-rl-design.md` — architecture, current limitations, scaling design
+  - `docs/intelligence/handoff-tier0-closeloop.md` — Tier 0 task + ready-to-run handoff for a fresh agent
+- **Immediate next step (Tier 0):** the MCTS loop is not yet "closed" (uniform policy + neutral
+  value → near-random play) and there is no strength signal. Add a heuristic value + wire Elo eval,
+  then confirm Elo climbs across iterations — before scaling games/features/compute.
+
 ### Key Decision
 
 **`@pkmn/engine` only supports Gen 1.** It cannot be used for Gen 9 Random Battles. The original Phase 1 (faster search via @pkmn/engine WASM) is blocked.
@@ -255,6 +268,50 @@ AWS (SageMaker/EC2 p5)
     far slower than random.
   - (c) The self-play net is 20-feature and NOT compatible with the browser's 206-feature v1
     model — do not drop it into `learned-eval.ts` as-is. v1 model remains untouched.
+
+---
+
+## Roadmap — Self-Play Scaling (Tier 0–2) — NEXT
+
+The pipeline runs end-to-end, but **each self-play game is currently near-random**: ISMCTS uses a
+uniform policy + a constant neutral value (`0.5`), the trained net is never fed back into search, and
+no strength metric runs. Scaling games/features/compute on top of that just produces more near-random
+data. The work is therefore ordered: make self-play *meaningful and measurable* first, then scale
+throughput, then features.
+
+### Tier 0 — Make self-play meaningful + measurable (DO FIRST)
+
+The immediate next task. Full instructions + acceptance criteria in
+`docs/intelligence/handoff-tier0-closeloop.md`.
+
+1. **Give MCTS a real value signal.** Replace `neutralValue` (passed at `self-play/sim/battle-runner.ts`
+   lines ~126 & ~137) with a heuristic `ValueFn` over the `@pkmn/sim` Battle (HP-fraction differential
+   + fainted counts), returning a 0..1 win-prob from p1's perspective. Cheapest interim signal before
+   the trained net is fed back. (Later: swap the heuristic for the trained net as `policyFn`/`valueFn`
+   to truly close the AlphaZero loop.)
+2. **Turn on Elo evaluation.** Wire the orphaned `self-play/training/elo_tracker.py`
+   (`track_elo`/`play_matches`) into `run.sh` so each iteration evaluates the net vs the baselines in
+   `self-play/sim/policies.ts` (`randomPolicy`, `heuristicPolicy`). Requires adding `--p1-policy`/
+   `--p2-policy` args to `sim-server.ts`.
+3. **Validate:** a 40-game × 5-iteration run that logs Elo per iteration and shows Elo trending up
+   vs the random baseline. This single experiment tells us whether the architecture learns at all.
+
+### Tier 1 — Faster + more games (throughput)
+
+- **Split actors from the learner.** Self-play is pure CPU MCTS — it does not need a GPU. Run it on
+  cheap many-core CPU instances (spot); train on GPU separately.
+- **Real parallelism.** The current `--workers` are async in one Node process → zero CPU parallelism
+  (hence ~7s/game serial). Use `worker_threads` or process-per-core.
+- **Profile the battle clone.** `BattleAdapter` clones via `toJSON`/`fromJSON` every simulation —
+  almost certainly the hot path. A faster/incremental clone multiplies sims/sec.
+- Request a SageMaker quota increase (currently capped at 1 × ml.g4dn.xlarge).
+
+### Tier 2 — More features (and make the model shippable)
+
+- **Unify the feature extractor** with the browser's 245-feature `src/eval/features.ts`
+  (self-play is currently a hand-rolled 20-feature vector in `alphazero_loop.py`). This enriches
+  features *and* makes a self-play model drop-in for the extension.
+- Grow the net once features are richer (the 20-feature MLP is tiny; GPU training only matters then).
 
 ---
 
