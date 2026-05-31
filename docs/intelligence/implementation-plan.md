@@ -83,6 +83,27 @@ A phased roadmap to evolve randbats-bot from a heuristic depth-2 searcher (~1000
   unnormalized), bootstrap value/policy from the heuristic or supervised model rather than from
   scratch, and raise MCTS sims. But the dominant lever is games/iter.
 
+### Latest (2026-05-31) — Tier 1: process-per-core self-play (works) + volume test (inconclusive)
+
+- **True parallelism implemented.** `sim-server.ts` now has a coordinator that forks N shard
+  processes (`--shard --workers 1`), each running games/N serially, then merges their JSONL — so
+  `--workers` finally scales CPU-bound MCTS across cores (was async-but-serial). Commit `f8d9819`.
+- **Validation** `randbats-alphazero-tier1-20260530-2035` → **Completed** (Dur 6411s ≈ 107 min),
+  config 5 iters × **200 games**/iter, NUM_WORKERS=4, sims=16, net feedback on.
+- **Parallelism confirmed:** iter 1 (cold) did "200 games in 900s across 4 processes" — ~4× speedup
+  (serial would be ~3600s).
+- **But net self-play is timeout-bottlenecked.** Games actually completed per iter:
+  `iter1(cold)=200, iter2=58, iter3=76, iter4=81, iter5=55` (each ~950s). Net-backed games exceed the
+  30s `GAME_TIMEOUT_MS` because onnxruntime-node inference in the MCTS hot loop is slow on the g4dn
+  CPU (~35 async infers/move), so most net games are dropped → **net iters were data-starved**
+  (fewer games than even the 40-game runs).
+- **Elo vs random:** `800 → 976 → 1007 → 847 → 912` — still no climb (noisy ~900).
+- **Conclusion:** the binding constraint for net-feedback is **ORT inference latency in the MCTS
+  loop**, not raw game count. Parallelism works, but it can't help if each net game times out. Next
+  agent must fix inference throughput (batch/cache evals, raise/scale the per-game timeout for net
+  games, or cut sims/determinizations for net self-play) BEFORE another volume test. See
+  `self-play-experiments.md` (run log) and `handoff-netfeedback-throughput.md` (next task).
+
 ### Key Decision
 
 **`@pkmn/engine` only supports Gen 1.** It cannot be used for Gen 9 Random Battles. The original Phase 1 (faster search via @pkmn/engine WASM) is blocked.
