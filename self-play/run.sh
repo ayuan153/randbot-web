@@ -33,6 +33,7 @@ POLICY=${POLICY:-mcts}
 MCTS_SIMS=${MCTS_SIMS:-32}
 ELO_GAMES=${ELO_GAMES:-20}
 RUN_ELO=${RUN_ELO:-1}
+BOOTSTRAP=${BOOTSTRAP:-0}
 
 ELO_SCRIPT="$(dirname "$TRAIN_SCRIPT")/elo_tracker.py"
 
@@ -46,7 +47,13 @@ for i in $(seq 1 $NUM_ITERATIONS); do
     # 1. Self-play
     echo "Running $NUM_GAMES self-play games..."
     cd "$SELF_PLAY_DIR"
-    if [ "$i" -gt 1 ]; then NET_ARG="--net $OUTPUT_DIR/models/iter_$((i-1)).onnx"; else NET_ARG=""; fi
+    if [ "$BOOTSTRAP" = "1" ]; then
+        NET_ARG=""   # bootstrap: heuristic MCTS self-play (no ORT in hot loop => no timeouts)
+    elif [ "$i" -gt 1 ]; then
+        NET_ARG="--net $OUTPUT_DIR/models/iter_$((i-1)).onnx"
+    else
+        NET_ARG=""
+    fi
     node --import tsx sim/sim-server.ts \
         --games "$NUM_GAMES" \
         --workers "$NUM_WORKERS" \
@@ -62,8 +69,16 @@ for i in $(seq 1 $NUM_ITERATIONS); do
         CHECKPOINT_ARGS="--checkpoint $PREV_CHECKPOINT"
     fi
 
+    if [ "$BOOTSTRAP" = "1" ]; then
+        TRAIN_DATA="$OUTPUT_DIR/games/accumulated.jsonl"
+        cat "$OUTPUT_DIR/games/"iter_*.jsonl > "$TRAIN_DATA"
+        echo "Bootstrap: training on accumulated data ($(wc -l < "$TRAIN_DATA") games) through iter ${i}"
+    else
+        TRAIN_DATA="$OUTPUT_DIR/games/iter_${i}.jsonl"
+    fi
+
     python3 "$TRAIN_SCRIPT" \
-        --data "$OUTPUT_DIR/games/iter_${i}.jsonl" \
+        --data "$TRAIN_DATA" \
         --epochs "$EPOCHS" \
         --output "$OUTPUT_DIR/models/iter_${i}.onnx" \
         --checkpoint "$OUTPUT_DIR/models/checkpoint.pt" \
