@@ -3,7 +3,11 @@
  * Usage: node --import tsx sim/sim-server.ts --games 100 --workers 4 --output results.jsonl --policy random|mcts
  */
 
-import {writeFileSync} from 'node:fs';
+import {spawn} from 'node:child_process';
+import {readFileSync, existsSync, unlinkSync, writeFileSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {fileURLToPath} from 'node:url';
 import {playGame, playEvalGame, type GameResult, type PolicyType, type EvalPolicy} from './battle-runner.ts';
 import {DEFAULT_MCTS_CONFIG, type MCTSConfig} from '../mcts/ismcts.ts';
 import {loadNet} from '../mcts/net-eval.ts';
@@ -19,6 +23,7 @@ interface Config {
   p1Policy?: EvalPolicy;
   p2Policy?: EvalPolicy;
   net?: string;
+  shard?: boolean;
 }
 
 function parseArgs(): Config {
@@ -32,6 +37,7 @@ function parseArgs(): Config {
   let p1Policy: EvalPolicy | undefined;
   let p2Policy: EvalPolicy | undefined;
   let net: string | undefined;
+  let shard = false;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--games') numGames = parseInt(args[++i]);
@@ -43,8 +49,9 @@ function parseArgs(): Config {
     else if (args[i] === '--p1-policy') p1Policy = args[++i] as EvalPolicy;
     else if (args[i] === '--p2-policy') p2Policy = args[++i] as EvalPolicy;
     else if (args[i] === '--net') net = args[++i];
+    else if (args[i] === '--shard') shard = true;
   }
-  return {numGames, numWorkers, output, policy, mctsSims, mctsDeterminizations, p1Policy, p2Policy, net};
+  return {numGames, numWorkers, output, policy, mctsSims, mctsDeterminizations, p1Policy, p2Policy, net, shard};
 }
 
 /** Run games concurrently in-process (each game is async, so they interleave) */
@@ -71,9 +78,51 @@ async function runGamesInProcess(numGames: number, concurrency: number, policy: 
   return results;
 }
 
+/** Coordinator: fork N shard processes for true CPU parallelism, merge their JSONL. */
+async function runShardedSelfPlay(config: Config): Promise<void> {
+  const n = config.numWorkers;
+  const per = Math.ceil(config.numGames / n);
+  const startTime = Date.now();
+  const tmps: string[] = [];
+  const procs: Promise<void>[] = [];
+  for (let k = 0; k < n; k++) {
+    const g = Math.min(per, config.numGames - k * per);
+    if (g <= 0) break;
+    const tmp = join(tmpdir(), `simshard_${process.pid}_${k}.jsonl`);
+    tmps.push(tmp);
+    const args = ['--import', 'tsx', fileURLToPath(import.meta.url),
+      '--games', String(g), '--workers', '1', '--shard',
+      '--output', tmp, '--policy', config.policy,
+      '--mcts-sims', String(config.mctsSims),
+      '--mcts-determinizations', String(config.mctsDeterminizations)];
+    if (config.net) args.push('--net', config.net);
+    procs.push(new Promise<void>((resolve, reject) => {
+      const child = spawn(process.execPath, args, {stdio: 'inherit'});
+      child.on('exit', (code) => code === 0 ? resolve() : reject(new Error(`shard ${k} exited ${code}`)));
+      child.on('error', reject);
+    }));
+  }
+  console.log(`Self-play: ${config.numGames} games across ${procs.length} shard processes...`);
+  await Promise.all(procs);
+  const merged = tmps.filter(t => existsSync(t)).map(t => readFileSync(t, 'utf8').trim()).filter(Boolean).join('\n');
+  writeFileSync(config.output, merged + '\n');
+  for (const t of tmps) { try { unlinkSync(t); } catch { /* ignore */ } }
+  const elapsed = (Date.now() - startTime) / 1000;
+  const count = merged ? merged.split('\n').length : 0;
+  console.log(`Completed ${count} games in ${elapsed.toFixed(1)}s (${(count / elapsed).toFixed(1)} games/sec) across ${procs.length} processes`);
+}
+
 async function main() {
   const config = parseArgs();
   const evalMode = config.p1Policy !== undefined && config.p2Policy !== undefined;
+  const isShard = config.shard === true;
+
+  // Coordinator: fork N shard processes for true CPU parallelism
+  if (!evalMode && config.numWorkers > 1 && !isShard) {
+    await runShardedSelfPlay(config);
+    return;
+  }
+
   const log = evalMode ? console.error.bind(console) : console.log.bind(console);
 
   // Load ONNX net once (non-fatal on failure)
