@@ -47,6 +47,24 @@ is iteration i's freshly-trained `iter_i.onnx`. Elo is from 30 games/baseline un
 - Lesson: the binding constraint for net feedback is **ORT inference latency in the MCTS hot loop**,
   not game count. Fix inference throughput before testing volume again.
 
+### Tier 1.5 — net-eval cache + legal-action prior renorm (`randbats-alphazero-20260531-0049`)
+- Changes: commit b932f83 (session-scoped net-eval cache keyed on the 20-float feature vector, shared by the policy and value calls) + commit b09fb18 (renormalize MCTS priors over each node's legal actions). Same config as Tier 1, so the cache is the only changed variable.
+- Config: 5 iters × 200 games, NUM_WORKERS=4, sims=16, net feedback on. Completed ~1h52m, under the 7200s cap; model.tar.gz saved.
+- Local: a net self-play game dropped to **2.7s** (38 turns, 16 sims × 5 dets), **97.5% cache hit rate** (200 logical infers → 5 ORT forward passes per move — the 20-feature vector is so coarse that ~5 unique vectors cover a whole move's search).
+- SageMaker game counts: iter1=200/200 (heuristic), iter2=130/200, iter3=120/200, iter4=114/200, iter5=130/200 — vs Tier 1's 200/58/76/81/55, the cache roughly **doubled** net-game completion.
+- vs_random Elo: **920.4 → 975.7 → 846.6 → 947.2 → 938.7** — still no climb (within noise).
+- Result: ⚠️ throughput improved but net self-play still drops ~18-22% of games; Elo flat.
+- Lesson: the cache cuts inference CALL COUNT (dedups policy+value and repeated coarse states) but not per-call CONTENTION. On the g4dn (4 vCPU) the 4 shard processes each run multi-threaded onnxruntime-node, oversubscribing the CPU and inflating per-inference latency until long net games brush the 30s cap (single-process locally a game was 2.7s). Diagnosed fix for the residual: cap ORT intra/inter-op threads to 1 per shard (4 shards × 1 = 4 threads on 4 vCPUs). Volume was not the cure for the flat Elo.
+
+### Bootstrap — heuristic-data self-play + accumulation (`randbats-bootstrap-20260531-0252`)
+- Change: commit 0c565e6 (BOOTSTRAP mode). Self-play uses heuristic MCTS (no --net → no ORT in the hot loop); training accumulates ALL iterations' JSONL (cat iter_*.jsonl); eval still uses iter_i.onnx (serial).
+- Config: BOOTSTRAP=1, 5 iters × 150 games, NUM_WORKERS=4, sims=16, EPOCHS=10, ELO_GAMES=30. Completed ~86 min, under cap; model.tar.gz (4.35 MB) saved.
+- Self-play: ALL 5 iters **150/150, ZERO timeouts** (iter times ~756/652/771/582/695s) — throughput fully solved (heuristic self-play has no inference in the hot loop).
+- Accumulation: **150 → 300 → 450 → 600 → 750** games (train samples ~27k → 50k+); early training loss improving (0.777 → 0.765).
+- vs_random Elo: **1125.2 → 967.7 → 975.7 → 938.7 → 800.0** (DECLINING; iter5 at the 800 floor). vs_heuristic: 929.6 → 1092.2 → 1024.9 → 939.5 → 1070.4 (volatile, no trend). estimated ~1027 → 935.
+- Result: ❌ no climb; vs_random got WORSE with more accumulated data, so the bootstrap did NOT beat the ~900 plateau.
+- Lesson (decisive): with clean full-volume accumulated data and zero throughput issues, the net STILL doesn't improve and degrades on vs_random as it trains on more data. This rules out throughput AND volume as the binding constraint. The cause is the **20-feature representation**: too coarse (~5 unique feature vectors per move) to support a discriminative policy/value, so more training collapses the net toward base rates, making it a worse MCTS guide than the heuristic. The binding constraint is REPRESENTATION (design-doc Tier 2: unify with the 245-feature `src/eval/features.ts`), not throughput or volume.
+
 ## Cross-run takeaways
 
 1. **Plumbing is solid:** loop closes, Elo logs, models export (`iter_1..5.onnx` + `checkpoint.pt` +
@@ -56,6 +74,8 @@ is iteration i's freshly-trained `iter_i.onnx`. Elo is from 30 games/baseline un
    g4dn gives; (b) net-inference latency — net self-play games time out at 30s, starving net iters.
 4. **The cold-start net is consistently competitive**, suggesting heuristic-guided data + a trained
    net used at eval/deploy time (bootstrap) may beat from-scratch net-vs-net at this budget.
+5. Throughput is solvable but was never the real blocker for learning. The net-eval cache (Tier 1.5) doubled net-game completion and a net game runs in 2.7s locally; bootstrap (heuristic self-play) eliminates self-play timeouts entirely. Neither made Elo climb.
+6. CONFIRMED binding constraint = the 20-feature representation, not throughput or volume. The bootstrap run gave the net clean, growing, full-volume data (150→750 games) with zero dropped games, and vs_random Elo still declined (1125→800). The coarse features (~5 unique vectors/move) cap what any net can learn; more data collapses it toward base rates. Next real lever is Tier 2 feature unification (245-feature src/eval/features.ts), then growing the net.
 
 ## Cost/time notes
 - A 5-iter run is ~$0.40-0.50 and ~55-107 min depending on games/iter.
