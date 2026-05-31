@@ -109,14 +109,17 @@ function selectChild(node: MCTSNode, cPuct: number): [string, MCTSNode] {
   return [bestAction, bestChild!];
 }
 
-/** Expand a leaf node: create children with policy priors */
+/** Expand a leaf node: create children with policy priors (renormalized over legal actions) */
 function expandNode(
   node: MCTSNode,
   legalActions: string[],
   priors: Map<string, number>,
 ): void {
+  const n = legalActions.length;
+  let sum = 0;
+  for (const action of legalActions) sum += priors.get(action) ?? 0;
   for (const action of legalActions) {
-    const prior = priors.get(action) ?? (1 / legalActions.length);
+    const prior = sum > 0 ? (priors.get(action) ?? 0) / sum : 1 / n;
     node.children.set(action, createNode(node, prior));
   }
 }
