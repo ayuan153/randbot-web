@@ -10,9 +10,19 @@ export async function loadNet(path: string): Promise<ort.InferenceSession> {
   return ort.InferenceSession.create(path);
 }
 
+/** Session-scoped cache: the net is deterministic so identical feature vectors always produce identical outputs. */
+const NET_CACHE = new WeakMap<ort.InferenceSession, Map<string, {policy: Float32Array; value: number}>>();
+
 async function infer(session: ort.InferenceSession, feats: Float32Array): Promise<{policy: Float32Array; value: number}> {
+  const key = feats.join(',');
+  let cache = NET_CACHE.get(session);
+  if (!cache) { cache = new Map(); NET_CACHE.set(session, cache); }
+  const hit = cache.get(key);
+  if (hit) return hit;
   const out = await session.run({features: new ort.Tensor('float32', feats, [1, 20])});
-  return {policy: out['policy'].data as Float32Array, value: (out['value'].data as Float32Array)[0]};
+  const result = {policy: out['policy'].data as Float32Array, value: (out['value'].data as Float32Array)[0]};
+  cache.set(key, result);
+  return result;
 }
 
 // p1-perspective value in [0,1] (drop-in for heuristicValue)
