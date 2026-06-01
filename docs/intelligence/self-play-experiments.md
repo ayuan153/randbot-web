@@ -65,6 +65,15 @@ is iteration i's freshly-trained `iter_i.onnx`. Elo is from 30 games/baseline un
 - Result: ❌ no climb; vs_random got WORSE with more accumulated data, so the bootstrap did NOT beat the ~900 plateau.
 - Lesson (decisive): with clean full-volume accumulated data and zero throughput issues, the net STILL doesn't improve and degrades on vs_random as it trains on more data. This rules out throughput AND volume as the binding constraint. The cause is the **20-feature representation**: too coarse (~5 unique feature vectors per move) to support a discriminative policy/value, so more training collapses the net toward base rates, making it a worse MCTS guide than the heuristic. The binding constraint is REPRESENTATION (design-doc Tier 2: unify with the 245-feature `src/eval/features.ts`), not throughput or volume.
 
+### Tier 2 — 225-feature bootstrap (`randbats-bootstrap-rich-20260601-1119`)
+- Change: full-Battle 225-feature extractor (commits 6bf9eab/7ef44d8/024a7e8, dep fix 4efdfe9) replacing the 20-feature request extractor. Records per-turn p1Features/p2Features vectors; Python trains directly on them (no re-extraction/parity); net widened to 225->256->256; accurate @smogon/calc damage/KO features. Bootstrap mode (heuristic self-play + cross-iter data accumulation).
+- Config: BOOTSTRAP=1, 5 iters × 150 games, NUM_WORKERS=4, sims=16, EPOCHS=10, ELO_GAMES=30. Completed ~92 min, under cap; model.tar.gz (3.9 MB) saved.
+- Self-play: ALL 5 iters **150/150, zero timeouts/crashes** from the new feature code. Accumulation 150 -> 300 -> 450 -> 600 -> 750.
+- Training loss (final/iter): **0.18, 0.25, 0.23, 0.28, 0.28** — MUCH lower than the 20-feature net's ~0.77. The rich representation is far more learnable / the net fits the data well.
+- vs_random Elo: **947.2 -> 894.9 -> 975.7 -> 1079.6 -> 870.4** (peaks at 1079.6 in iter 4, above the ~1041 MCTS+heuristic ceiling and the ~900 plateau, but NOT retained). vs_heuristic: 1023.2 -> 1000.0 -> 1046.6 -> 1085.6 -> 984.9.
+- Result: ❌ no SUSTAINED climb — high-variance oscillation (range ~210), final (870) below first (947). Representation bottleneck is resolved (loss 0.77->0.18) and the net reached 1080 at one iter, but no monotonic learning curve.
+- Lessons: (a) the 225-feature representation IS learnable (loss collapse) — so representation was a real bottleneck and is now lifted; (b) the experiment is UNDERPOWERED to detect a climb: 30-game eval carries +-60-90 Elo noise, so the 5-point range (~210) is consistent with pure noise around a ~950-1000 mean; (c) the trainer fresh-initializes the net each iter and data grows only 150->750, so the 5 Elo points are ~independent noisy (net, eval) samples, NOT a learning curve; (d) iter5's drop may also be overfitting/forgetting on the 750-game set. Next levers: low-noise eval (hundreds of games per baseline; e.g. an eval-only job over the saved iter_*.onnx, since a full 5-iter run can't fit high ELO_GAMES under the 7200s cap with serial eval); a proper data-volume learning curve (150 vs 1k vs 5k games); warm-start or train/val early-stopping.
+
 ## Cross-run takeaways
 
 1. **Plumbing is solid:** loop closes, Elo logs, models export (`iter_1..5.onnx` + `checkpoint.pt` +
@@ -76,6 +85,7 @@ is iteration i's freshly-trained `iter_i.onnx`. Elo is from 30 games/baseline un
    net used at eval/deploy time (bootstrap) may beat from-scratch net-vs-net at this budget.
 5. Throughput is solvable but was never the real blocker for learning. The net-eval cache (Tier 1.5) doubled net-game completion and a net game runs in 2.7s locally; bootstrap (heuristic self-play) eliminates self-play timeouts entirely. Neither made Elo climb.
 6. CONFIRMED binding constraint = the 20-feature representation, not throughput or volume. The bootstrap run gave the net clean, growing, full-volume data (150→750 games) with zero dropped games, and vs_random Elo still declined (1125→800). The coarse features (~5 unique vectors/move) cap what any net can learn; more data collapses it toward base rates. Next real lever is Tier 2 feature unification (245-feature src/eval/features.ts), then growing the net.
+7. Representation was a genuine bottleneck but not the last one. The 225-feature extractor cut training loss 0.77->0.18 and the net reached 1080 vs_random at one iteration (above the heuristic ceiling), yet no run shows a SUSTAINED climb. The binding constraint is now EVAL SIGNAL-TO-NOISE and experiment design: 30-game eval (+-60-90 Elo) cannot resolve a plausible-size improvement, and fresh-init + 150->750 data is not a learning curve. Next: low-noise eval over saved nets + a real data-volume sweep.
 
 ## Cost/time notes
 - A 5-iter run is ~$0.40-0.50 and ~55-107 min depending on games/iter.

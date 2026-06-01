@@ -81,3 +81,11 @@ Policy head (10 actions) and the bootstrap loop are unchanged — only the input
 3. OK to use a **lightweight inline damage estimate** instead of `@smogon/calc` in v1?
 4. Keep raw **type 1-hot (18×2=36)** for the two actives, or compress to derived effectiveness only
    (saves ~30 dims, less expressive)?
+
+## Result (2026-06-01)
+
+FEATURE_DIM=225 implemented and shipped (commits 6bf9eab/7ef44d8/024a7e8/4efdfe9). Run
+`randbats-bootstrap-rich-20260601-1119` Completed. Training loss dropped ~0.77 → ~0.2
+(representation is learnable). vs_random Elo 947/895/976/1080/870 — hit 1080 at iter4 but no
+sustained climb. The 30-game eval is too noisy to resolve a climb and the bottleneck shifts to eval
+signal-to-noise + experiment design (see `self-play-experiments.md` Tier 2 entry).
