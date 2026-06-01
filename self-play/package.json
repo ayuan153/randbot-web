@@ -12,6 +12,7 @@
     "@pkmn/dex": "latest",
     "@pkmn/randoms": "latest",
     "@pkmn/sim": "latest",
+    "@smogon/calc": "^0.11.0",
     "onnxruntime-node": "^1.26.0"
   },
   "devDependencies": {
