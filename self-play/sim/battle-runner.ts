@@ -12,6 +12,7 @@ import type {InferenceSession} from 'onnxruntime-node';
 import {netPolicyFn, netValueFn} from '../mcts/net-eval.ts';
 import {BattleAdapter} from './battle-adapter.ts';
 import {randomPolicy, heuristicPolicy} from './policies.ts';
+import {extractFeatures} from '../mcts/net-features.ts';
 
 // Register the random team generator
 Teams.setGeneratorFactory(TeamGenerators);
@@ -24,6 +25,8 @@ export interface TurnRecord {
   p2Choice: string;
   p1Policy?: Record<string, number>;
   p2Policy?: Record<string, number>;
+  p1Features?: number[];
+  p2Features?: number[];
 }
 
 export interface GameResult {
@@ -170,6 +173,8 @@ async function runMCTSGameInternal(config: MCTSConfig, net?: InferenceSession): 
       p2Choice,
       ...(p1Policy && {p1Policy}),
       ...(p2Policy && {p2Policy}),
+      p1Features: Array.from(extractFeatures(battle, 'p1')),
+      p2Features: Array.from(extractFeatures(battle, 'p2')),
     });
 
     if (p1NeedsChoice) battle.choose('p1', p1Choice);

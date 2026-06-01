@@ -1,4 +1,16 @@
-import {describe, it, expect} from 'vitest';
+import {describe, it, expect, vi} from 'vitest';
+
+// Mock extractFeatures to return a deterministic vector based on the battle state
+vi.mock('./net-features.ts', () => ({
+  FEATURE_DIM: 225,
+  extractFeatures: (battle: {turn: number}, _side: string) => {
+    // Return a unique vector per turn number so cache tests work
+    const f = new Float32Array(225);
+    f[0] = battle.turn;
+    return f;
+  },
+}));
+
 import {netValueFn, netPolicyFn} from './net-eval.ts';
 
 /** Minimal stub matching the InferenceSession shape used by infer() */
@@ -17,19 +29,14 @@ function makeStubSession() {
   return session;
 }
 
-/** Fake battle state that yields a known feature vector */
+/** Fake battle state — extractFeatures is mocked so only `turn` matters */
 function makeState(turn: number) {
-  return {
-    turn,
-    p1: {activeRequest: {pokemon: [{hp: 100, maxhp: 100, moves: ['tackle'], item: 'leftovers', ability: 'overgrow', teraType: 'Normal', status: ''}], active: [{moves: [{id: 'tackle', pp: 35, maxpp: 35}]}]}},
-    p2: {activeRequest: {pokemon: [{hp: 80, maxhp: 100, moves: ['ember'], item: 'charcoal', ability: 'blaze', teraType: 'Fire', status: ''}], active: [{moves: [{id: 'ember', pp: 25, maxpp: 25}]}]}},
-  };
+  return {turn};
 }
 
 describe('net-eval cache', () => {
   it('deduplicates infer calls for same feature vector across value+policy', async () => {
     const session = makeStubSession();
-    // Cast through unknown to satisfy ort.InferenceSession type without `as any`
     const valueFn = netValueFn(session as unknown as Parameters<typeof netValueFn>[0]);
     const policyFn = netPolicyFn(session as unknown as Parameters<typeof netPolicyFn>[0], 'p1');
 
