@@ -34,10 +34,38 @@ MCTS_SIMS=${MCTS_SIMS:-32}
 ELO_GAMES=${ELO_GAMES:-20}
 RUN_ELO=${RUN_ELO:-1}
 BOOTSTRAP=${BOOTSTRAP:-0}
+EVAL_ONLY=${EVAL_ONLY:-0}
+# Where EVAL_ONLY reads iter_*.onnx from (SageMaker input channel by default).
+EVAL_MODELS_DIR=${EVAL_MODELS_DIR:-/opt/ml/input/data/models}
 
 ELO_SCRIPT="$(dirname "$TRAIN_SCRIPT")/elo_tracker.py"
 
 mkdir -p "$OUTPUT_DIR/games" "$OUTPUT_DIR/models"
+
+# EVAL_ONLY: skip self-play + training entirely; run a low-noise Elo eval over a
+# pre-supplied set of *.onnx nets. Serial eval fits because nothing else runs.
+if [ "$EVAL_ONLY" = "1" ]; then
+    echo "=== EVAL_ONLY mode: $ELO_GAMES games/baseline, sims=$MCTS_SIMS, dir=$EVAL_MODELS_DIR ==="
+    shopt -s nullglob
+    onnx_files=("$EVAL_MODELS_DIR"/*.onnx)
+    if [ "${#onnx_files[@]}" -eq 0 ]; then
+        echo "ERROR: EVAL_ONLY=1 but no .onnx files in $EVAL_MODELS_DIR" >&2; exit 1
+    fi
+    cd "$SELF_PLAY_DIR"
+    for onnx in "${onnx_files[@]}"; do
+        name="$(basename "$onnx" .onnx)"
+        echo "=== Eval $name ==="
+        python3 "$ELO_SCRIPT" --model mcts --games "$ELO_GAMES" --mcts-sims "$MCTS_SIMS" \
+            --net "$onnx" \
+            --output "$OUTPUT_DIR/models/elo_${name}.json" || echo "WARN: Elo eval failed for $name (non-fatal)"
+    done
+    if [ -d /opt/ml/model ]; then
+        cp -r "$OUTPUT_DIR/models/." /opt/ml/model/
+        echo "Copied eval results to /opt/ml/model/"
+    fi
+    echo "=== EVAL_ONLY complete ==="
+    exit 0
+fi
 
 PREV_CHECKPOINT=""
 
