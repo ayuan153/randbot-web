@@ -29,8 +29,10 @@ from policy_value_net import PolicyValueNet
 
 # ─── Config ───────────────────────────────────────────────────────────────────
 
+FEATURE_DIM = 225  # Rich feature vector from net-features.ts extractFeatures()
+
 DEFAULT_CONFIG = {
-    "input_dim": 20,
+    "input_dim": FEATURE_DIM,
     "max_actions": 10,
     "batch_size": 256,
     "learning_rate": 1e-3,
@@ -40,25 +42,7 @@ DEFAULT_CONFIG = {
 }
 
 
-# ─── Feature extraction ───────────────────────────────────────────────────────
-
-FEATURE_DIM = 20  # Fixed feature vector size for self-play training
-
-
-def parse_hp_fraction(condition: str) -> float:
-    """Parse PS condition string like '248/300' or '0 fnt' to HP fraction."""
-    if not condition or 'fnt' in condition:
-        return 0.0
-    parts = condition.split('/')
-    if len(parts) < 2:
-        return 0.0
-    try:
-        hp = int(parts[0])
-        maxhp = int(parts[1].split()[0])
-        return hp / maxhp if maxhp > 0 else 0.0
-    except (ValueError, IndexError):
-        return 0.0
-
+# ─── Helpers ──────────────────────────────────────────────────────────────────
 
 def parse_choice(choice: str) -> int:
     """Parse PS choice string to action index 0-9.
@@ -78,94 +62,6 @@ def parse_choice(choice: str) -> int:
     return 0
 
 
-def get_action_mask(request: dict) -> np.ndarray:
-    """Build action mask from request's available moves/switches."""
-    mask = np.zeros(10, dtype=np.float32)
-    # Moves
-    active = request.get('active', [{}])
-    if active:
-        moves = active[0].get('moves', [])
-        for i, m in enumerate(moves[:4]):
-            if not m.get('disabled', False):
-                mask[i] = 1.0
-    # Switches
-    for mon in request.get('side', {}).get('pokemon', []):
-        if mon.get('active'):
-            continue
-        if 'fnt' in mon.get('condition', ''):
-            continue
-        # Find slot index (1-based position in team)
-        team = request['side']['pokemon']
-        idx = team.index(mon)
-        mask[min(idx + 4, 9)] = 1.0
-    # If forced switch (no active moves available), only switches are legal
-    if request.get('forceSwitch'):
-        mask[:4] = 0.0
-    return mask
-
-
-def extract_features_from_request(request: dict, opp_request: dict, turn_num: int) -> np.ndarray:
-    """Extract 20-dim feature vector from PS request objects.
-
-    Features:
-      0-5:  My 6 mons HP fraction
-      6-11: Opp 6 mons HP fraction
-      12:   My alive count / 6
-      13:   Opp alive count / 6
-      14:   My active HP fraction
-      15:   Opp active HP fraction
-      16:   Num moves available / 4
-      17:   Turn number / 100
-      18:   Is forced switch
-      19:   Padding (0)
-    """
-    features = np.zeros(FEATURE_DIM, dtype=np.float32)
-
-    # My team HP fractions
-    my_team = request.get('side', {}).get('pokemon', [])
-    my_alive = 0
-    for i, mon in enumerate(my_team[:6]):
-        hp = parse_hp_fraction(mon.get('condition', '0 fnt'))
-        features[i] = hp
-        if hp > 0:
-            my_alive += 1
-
-    # Opp team HP fractions
-    opp_team = opp_request.get('side', {}).get('pokemon', [])
-    opp_alive = 0
-    for i, mon in enumerate(opp_team[:6]):
-        hp = parse_hp_fraction(mon.get('condition', '0 fnt'))
-        features[6 + i] = hp
-        if hp > 0:
-            opp_alive += 1
-
-    features[12] = my_alive / 6.0
-    features[13] = opp_alive / 6.0
-
-    # Active HP (first mon marked active, or index 0)
-    features[14] = features[0]
-    for i, mon in enumerate(my_team[:6]):
-        if mon.get('active'):
-            features[14] = features[i]
-            break
-    features[15] = features[6]
-    for i, mon in enumerate(opp_team[:6]):
-        if mon.get('active'):
-            features[15] = features[6 + i]
-            break
-
-    # Moves available
-    active = request.get('active', [{}])
-    if active:
-        moves = [m for m in active[0].get('moves', []) if not m.get('disabled')]
-        features[16] = len(moves) / 4.0
-
-    features[17] = min(turn_num / 100.0, 1.0)
-    features[18] = 1.0 if request.get('forceSwitch') else 0.0
-
-    return features
-
-
 # ─── Data loading ─────────────────────────────────────────────────────────────
 
 def load_game_data(data_path: str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -173,7 +69,11 @@ def load_game_data(data_path: str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     Load training data from sim-server JSONL.
 
     Each line is a game: {"winner": "p1"|"p2", "numTurns": N, "turns": [...]}
-    Each turn: {"turn": N, "p1Request": {...}, "p2Request": {...}, "p1Choice": "...", "p2Choice": "..."}
+    Each turn has pre-recorded p1Features/p2Features (225-dim vectors).
+
+    Emits TWO samples per turn (perspective-symmetric):
+      - sample A: p1's features, p1's policy target, p1's value
+      - sample B: p2's features, p2's policy target, p2's value
 
     Returns: (states, policies, values) as numpy arrays
     """
@@ -188,49 +88,40 @@ def load_game_data(data_path: str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
             turns = game.get("turns", [])
 
             for turn_data in turns:
-                turn_num = turn_data.get("turn", 0)
-
-                # Generate samples from both players' perspectives
                 for player in ("p1", "p2"):
-                    opp = "p2" if player == "p1" else "p1"
-                    request = turn_data.get(f"{player}Request")
-                    opp_request = turn_data.get(f"{opp}Request")
-                    choice = turn_data.get(f"{player}Choice", "")
-
-                    if not request or not opp_request or not choice:
+                    feats = turn_data.get(f"{player}Features")
+                    if not feats or len(feats) != FEATURE_DIM:
                         continue
 
-                    # Features
-                    feats = extract_features_from_request(request, opp_request, turn_num)
-                    states.append(feats)
-
-                    # Policy target: use MCTS visit probs if available, else one-hot from choice
-                    mcts_policy = turn_data.get(f"{player}Policy")
+                    choice = turn_data.get(f"{player}Choice", "")
                     action_idx = parse_choice(choice)
+
+                    # Policy target: MCTS visit probs if available, else one-hot
+                    mcts_policy = turn_data.get(f"{player}Policy")
                     policy = np.zeros(10, dtype=np.float32)
 
                     if mcts_policy and isinstance(mcts_policy, dict):
-                        # Map MCTS action probs to the 10-action index space
                         for action_str, prob in mcts_policy.items():
                             idx = parse_choice(action_str)
                             policy[idx] += prob
-                        # Renormalize in case of rounding
                         total = policy.sum()
                         if total > 0:
                             policy /= total
                         else:
                             policy[action_idx] = 1.0
                     else:
-                        # Fallback: one-hot with uniform baseline over legal actions
-                        mask = get_action_mask(request)
-                        if mask.sum() > 0:
-                            policy = mask / mask.sum()  # uniform baseline
                         policy[action_idx] = 1.0
-                        policy /= policy.sum()  # renormalize
+
+                    states.append(np.array(feats, dtype=np.float32))
                     policies.append(policy)
 
-                    # Value target
-                    value = 1.0 if winner == player else -1.0
+                    # Value target: +1 if this player won, -1 if lost, 0 draw
+                    if winner == player:
+                        value = 1.0
+                    elif winner == ("p2" if player == "p1" else "p1"):
+                        value = -1.0
+                    else:
+                        value = 0.0
                     values.append(value)
 
     if not states:
@@ -325,7 +216,7 @@ def train_model(
 
 # ─── Export ───────────────────────────────────────────────────────────────────
 
-def export_onnx(model: PolicyValueNet, output_path: str, input_dim: int = 245) -> None:
+def export_onnx(model: PolicyValueNet, output_path: str, input_dim: int = FEATURE_DIM) -> None:
     """Export trained model to ONNX format for browser inference."""
     model = model.to("cpu")
     model.eval()

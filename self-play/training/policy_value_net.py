@@ -2,11 +2,11 @@
 policy_value_net.py — Combined Policy + Value network for AlphaZero-style training.
 
 Architecture:
-  - Shared trunk (input → 512 → 256)
+  - Shared trunk (input → 256 → 256)
   - Policy head (256 → 128 → max_actions) — action probabilities
   - Value head (256 → 64 → 1) — win probability [-1, 1]
 
-Input: 245-dim feature vector (206 base features + 39 MCTS-specific features)
+Input: 225-dim feature vector from net-features.ts extractFeatures()
 Output: (policy: [batch, max_actions], value: [batch, 1])
 """
 
@@ -18,20 +18,20 @@ import torch.nn.functional as F
 class PolicyValueNet(nn.Module):
     """Combined policy + value network for Pokémon battle evaluation."""
 
-    def __init__(self, input_dim: int = 245, max_actions: int = 10):
+    def __init__(self, input_dim: int = 225, max_actions: int = 10):
         """
         Args:
-            input_dim: Feature vector size (206 base + 39 MCTS features)
+            input_dim: Feature vector size (225 from extractFeatures)
             max_actions: Max legal actions (4 moves + 5 switches + 1 tera = 10)
         """
         super().__init__()
 
         # Shared trunk
         self.trunk = nn.Sequential(
-            nn.Linear(input_dim, 512),
+            nn.Linear(input_dim, 256),
             nn.ReLU(),
             nn.Dropout(0.1),
-            nn.Linear(512, 256),
+            nn.Linear(256, 256),
             nn.ReLU(),
         )
 
@@ -82,7 +82,7 @@ class PolicyValueNet(nn.Module):
 if __name__ == "__main__":
     # Quick sanity check
     model = PolicyValueNet()
-    x = torch.randn(4, 245)
+    x = torch.randn(4, 225)
     mask = torch.ones(4, 10, dtype=torch.bool)
     mask[:, 7:] = False  # mask out last 3 actions
 
