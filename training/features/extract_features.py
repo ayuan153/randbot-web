@@ -23,7 +23,7 @@ from pathlib import Path
 import numpy as np
 from tqdm import tqdm
 
-from .battle_state import BattleState, update_state
+from .battle_state import BattleState, update_state, parse_pokemon_ident
 from .type_chart import type_effectiveness
 from .base_stats import (
     get_types, get_move_type_power, estimate_speed, MOVE_BASE_POWERS,
@@ -50,6 +50,23 @@ STATUS_MAP = {"": 0.0, "brn": 1/6, "par": 2/6, "slp": 3/6, "frz": 4/6, "psn": 5/
 WEATHERS = ["SunnyDay", "RainDance", "Sandstorm", "Snow", "Desolate Land", "Primordial Sea"]
 # Terrain one-hot order
 TERRAINS = ["electric", "grassy", "misty", "psychic", ""]
+
+# Policy action space (size 5): 0-3 = move slots (moves sorted by normalized id, so
+# the index matches the live |request| which lists all 4 moves), 4 = switch (any
+# target). Switch TARGET is not recoverable from replays (no |request|; mons are
+# revealed in play-order, not the team's fixed roster order) so it is deferred to
+# value-net lookahead at inference. -1 = no/ambiguous label (masked in the CE loss).
+ACTION_DIM = 5
+SWITCH_ACTION = 4
+NO_ACTION = -1       # no action captured this turn -> excluded from policy loss
+MOVE_UNKNOWN = -2    # known to be a move (not switch) but exact slot unresolved
+                     # (mon never revealed all 4 moves) -> "not-switch" marginal loss
+
+
+def _move_id(name: str) -> str:
+    """Normalize a move display name to its showdown id (lowercase alphanumerics),
+    matching request.active[].moves[].id so train/infer move ordering agree."""
+    return "".join(c for c in name.lower() if c.isalnum())
 
 
 def _pokemon_features(mon) -> list[float]:
@@ -512,15 +529,44 @@ def extract_features(state: BattleState, perspective: int) -> np.ndarray:
 extract_features_from_state = extract_features
 
 
-def process_replay(replay_data: dict) -> list[tuple[np.ndarray, float]]:
-    """Process a single replay into (features, label) pairs from both perspectives."""
+def _resolve_action(sample: dict, state: BattleState) -> int:
+    """Map a captured decision to an action index in [0,4], or NO_ACTION (-1).
+
+    Move slot = rank of the chosen move's id among the active mon's full revealed
+    moveset (sorted by id). Switch = SWITCH_ACTION regardless of target."""
+    action = sample["action"]
+    if action is None:
+        return NO_ACTION
+    if action[0] == "switch":
+        return SWITCH_ACTION
+    move_name = action[1]
+    side = state.sides[sample["perspective"]]
+    mon = next((m for m in side.pokemon if m.species == sample["active"]), None)
+    if mon is None:
+        return NO_ACTION
+    move_ids = sorted({_move_id(m) for m in mon.moves_known})
+    # Exact slot needs the full 4-move set (ranking among <4 revealed would not match
+    # the live |request|). If unknown, still record that it WAS a move (not a switch).
+    if len(move_ids) != 4:
+        return MOVE_UNKNOWN
+    mid = _move_id(move_name)
+    if mid not in move_ids:
+        return MOVE_UNKNOWN
+    return move_ids.index(mid)
+
+
+def process_replay(replay_data: dict) -> list[tuple[np.ndarray, float, int]]:
+    """Process a replay into (features, win_label, action_index) triples from both
+    perspectives. action_index is NO_ACTION (-1) when the chosen action can't be
+    resolved (e.g. the side made no move that turn, or the move id is ambiguous)."""
     log = replay_data.get("log", "")
     if not log:
         return []
 
-    players = {}  # "p1" -> player name, "p2" -> player name
+    players = {}  # "p1"/"p2" -> player name
     state = BattleState()
     samples = []
+    pending = {}  # perspective -> sample awaiting this turn's chosen action
 
     for line in log.split("\n"):
         line = line.strip()
@@ -528,21 +574,32 @@ def process_replay(replay_data: dict) -> list[tuple[np.ndarray, float]]:
             continue
 
         parts = line.split("|")
-        if len(parts) >= 3 and parts[1] == "player":
-            player_id = parts[2]  # "p1" or "p2"
-            if len(parts) >= 4:
-                players[player_id] = parts[3]
+        if len(parts) >= 4 and parts[1] == "player":
+            players[parts[2]] = parts[3]
 
-        # Extract features at each turn boundary
+        # Emit features at each turn boundary (state BEFORE the turn's actions run);
+        # the chosen action is captured from the |move|/|switch| lines that follow.
         if parts[1] == "turn" and state.turn > 0:
-            # We don't know winner yet, store state snapshot
+            pending = {}
             for perspective in [0, 1]:
                 feat = extract_features(state, perspective)
-                samples.append((feat, perspective))
+                s = {"feat": feat, "perspective": perspective,
+                     "active": state.sides[perspective].active.species, "action": None}
+                samples.append(s)
+                pending[perspective] = s
+
+        # Capture each side's FIRST action this turn = its start-of-turn decision.
+        if parts[1] in ("move", "switch") and len(parts) >= 3:
+            side_idx, _ = parse_pokemon_ident(parts[2])
+            s = pending.get(side_idx)
+            if s is not None and s["action"] is None:
+                if parts[1] == "move" and len(parts) >= 4:
+                    s["action"] = ("move", parts[3])
+                elif parts[1] == "switch":
+                    s["action"] = ("switch",)
 
         update_state(state, line)
 
-    # Determine winner
     if not state.winner:
         return []
 
@@ -551,17 +608,14 @@ def process_replay(replay_data: dict) -> list[tuple[np.ndarray, float]]:
         if name == state.winner:
             winner_side = 0 if pid == "p1" else 1
             break
-
     if winner_side == -1:
         return []
 
-    # Assign labels
-    labeled = []
-    for feat, perspective in samples:
-        label = 1.0 if perspective == winner_side else 0.0
-        labeled.append((feat, label))
-
-    return labeled
+    out = []
+    for s in samples:
+        label = 1.0 if s["perspective"] == winner_side else 0.0
+        out.append((s["feat"], label, _resolve_action(s, state)))
+    return out
 
 
 def extract_from_directory(input_dir: str, output_path: str):
@@ -575,14 +629,16 @@ def extract_from_directory(input_dir: str, output_path: str):
 
     all_features = []
     all_labels = []
+    all_actions = []
 
     for filepath in tqdm(replay_files, desc="Extracting features"):
         try:
             data = json.loads(filepath.read_text())
             samples = process_replay(data)
-            for feat, label in samples:
+            for feat, label, action in samples:
                 all_features.append(feat)
                 all_labels.append(label)
+                all_actions.append(action)
         except (json.JSONDecodeError, KeyError, ValueError):
             continue
 
@@ -592,11 +648,21 @@ def extract_from_directory(input_dir: str, output_path: str):
 
     features = np.stack(all_features)
     labels = np.array(all_labels, dtype=np.float32)
+    actions = np.array(all_actions, dtype=np.int64)
 
     output = Path(output_path)
     output.parent.mkdir(parents=True, exist_ok=True)
-    np.savez(output, features=features, labels=labels)
+    np.savez(output, features=features, labels=labels, actions=actions)
+    captured = actions != NO_ACTION
+    is_switch = actions == SWITCH_ACTION
+    move_known = (actions >= 0) & (actions < 4)
+    move_unknown = actions == MOVE_UNKNOWN
     print(f"Saved {len(labels)} samples ({labels.mean():.2%} win rate) to {output_path}")
+    print(f"  actions captured: {captured.mean():.1%}; of captured -> "
+          f"switch {is_switch.sum()/max(1,captured.sum()):.1%}, "
+          f"move {(move_known|move_unknown).sum()/max(1,captured.sum()):.1%} "
+          f"(slot-resolved {move_known.sum()/max(1,(move_known|move_unknown).sum()):.1%})")
+    print(f"  move-slot dist (0-3): {np.bincount(actions[move_known], minlength=4).tolist()}")
 
 
 if __name__ == "__main__":
