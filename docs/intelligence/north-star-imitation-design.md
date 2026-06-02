@@ -150,6 +150,20 @@ with the heuristic `evaluate`. Now:
 - **Follow-ups:** switch the loaded model from `value-net-v1.onnx` to the imitation-dual value head
   (0.67 vs 0.65, same 245 features); batch/cache leaf inferences; tune α; measure via live ladder GXE.
 
+### Checkpoint B: per-move policy features (done)
+The v1 policy saw only state features, capping move top-1 at ~0.30. Added a 4×5 per-move block
+(type-eff vs foe, BP, is-status, priority, STAB) in sorted-move-id order (features 245→265), and a
+`DualNet2` whose policy is a **shared per-move scorer** over (state-context ⊕ each move block) so
+logit i aligns with move block i. Value head stays on the 245 state (decoupled, still usable as the
+leaf eval). Same 100K games ≥1500, 5.0M samples, 20 epochs.
+- **move top-1: 0.302 → 0.348** (+15% rel; ~0.098 above the 0.25 random floor vs 0.052 for v1 — nearly
+  double the signal). win-pred unchanged at 0.67 (value head is decoupled, as designed).
+- Artifact: `models/imitation-dual-v2.onnx` (+`.data`); input `state[265]`, outputs `win_probability`
+  + `policy_logits[5]`.
+- **Not yet wired into play:** the policy net needs per-move features at inference, so wiring it into
+  search (as a move-ordering / MCTS prior) requires `src/eval/features.ts` to emit the 4×5 per-move
+  block in the same sorted-id order. That + a switch-target lookahead is the next wiring checkpoint.
+
 ## Status
 - [x] Reframe + design (this doc)
 - [x] T1 policy-label extraction
@@ -158,4 +172,7 @@ with the heuristic `evaluate`. Now:
 - [x] T1 export dual-head ONNX (`models/imitation-dual-v1.onnx`)
 - [x] T0 ladder client (`ladder/`, core unit-tested) — needs a registered account to run live
 - [ ] T0 strong local anchor (deferred; live ladder GXE is the real anchor)
-- [ ] Track 2: per-move features for the policy head; wire value net as the minimax leaf eval
+- [x] Track 2A: value net wired as the minimax leaf evaluator (blended)
+- [x] Track 2B: per-move features for the policy head (move top-1 0.30→0.35)
+- [ ] Track 2C (next): emit per-move features in `src/eval/features.ts` + wire the policy as a
+      search prior with switch-target lookahead; swap leaf-eval to the imitation value head; ladder GXE
