@@ -555,6 +555,42 @@ def _resolve_action(sample: dict, state: BattleState) -> int:
     return move_ids.index(mid)
 
 
+# Per-move policy features: K per move, in the SAME sorted-by-id order as the
+# policy move slots, so policy logit i aligns with move block i.
+MOVE_FEAT_DIM = 5          # [type-eff vs foe, bp, is-status, priority, STAB]
+STATE_DIM = 245
+FEATURE_DIM = STATE_DIM + 4 * MOVE_FEAT_DIM  # 265
+
+
+def _move_features(sample: dict, state: BattleState) -> list[float]:
+    """4×5 per-move features for the active mon vs the captured opponent active,
+    in sorted-move-id order. Zeros unless the full 4-move set is known (matching
+    the move-slot label condition)."""
+    zeros = [0.0] * (4 * MOVE_FEAT_DIM)
+    mon = next((m for m in state.sides[sample["perspective"]].pokemon
+                if m.species == sample["active"]), None)
+    if mon is None:
+        return zeros
+    by_id = {_move_id(n): n for n in mon.moves_known}
+    if len(by_id) != 4:
+        return zeros
+    my_types = get_types(sample["active"]) or ["Normal"]
+    opp_types = get_types(sample.get("opp_active") or "") or ["Normal"]
+    feats: list[float] = []
+    for mid in sorted(by_id):
+        name = by_id[mid]
+        mtype, bp = get_move_type_power(name)
+        eff = type_effectiveness(mtype, opp_types) if mtype else 1.0
+        feats += [
+            min(eff / 4.0, 1.0),
+            min(bp / 150.0, 1.0),
+            1.0 if bp == 0 else 0.0,
+            1.0 if name in PRIORITY_MOVES else 0.0,
+            1.0 if mtype in my_types else 0.0,
+        ]
+    return feats
+
+
 def process_replay(replay_data: dict) -> list[tuple[np.ndarray, float, int]]:
     """Process a replay into (features, win_label, action_index) triples from both
     perspectives. action_index is NO_ACTION (-1) when the chosen action can't be
@@ -584,7 +620,8 @@ def process_replay(replay_data: dict) -> list[tuple[np.ndarray, float, int]]:
             for perspective in [0, 1]:
                 feat = extract_features(state, perspective)
                 s = {"feat": feat, "perspective": perspective,
-                     "active": state.sides[perspective].active.species, "action": None}
+                     "active": state.sides[perspective].active.species,
+                     "opp_active": state.sides[1 - perspective].active.species, "action": None}
                 samples.append(s)
                 pending[perspective] = s
 
@@ -614,7 +651,8 @@ def process_replay(replay_data: dict) -> list[tuple[np.ndarray, float, int]]:
     out = []
     for s in samples:
         label = 1.0 if s["perspective"] == winner_side else 0.0
-        out.append((s["feat"], label, _resolve_action(s, state)))
+        feat = np.concatenate([s["feat"], np.array(_move_features(s, state), dtype=np.float32)])
+        out.append((feat, label, _resolve_action(s, state)))
     return out
 
 

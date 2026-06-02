@@ -34,6 +34,9 @@ ACTION_DIM = 5
 SWITCH_ACTION = 4
 NO_ACTION = -1
 MOVE_UNKNOWN = -2
+STATE_DIM = 245
+MOVE_FEAT_DIM = 5            # per-move features appended after the state (4 moves)
+MOVED_DIM = STATE_DIM + 4 * MOVE_FEAT_DIM  # 265
 
 
 class DualNet(nn.Module):
@@ -54,6 +57,37 @@ class DualNet(nn.Module):
     def forward(self, x):
         h = self.backbone(x)
         return self.value_head(h), self.policy_head(h)
+
+
+class DualNet2(nn.Module):
+    """Value + policy net with PER-MOVE features. Input = state[245] ++ move
+    blocks[4*5]. Value head uses only the state (decoupled, reusable as a leaf
+    eval). Policy = a SHARED per-move scorer applied to (state-context ⊕ each move
+    block) so logit i aligns with move block i, plus a switch scorer."""
+
+    def __init__(self, state_dim: int = STATE_DIM, move_feat_dim: int = MOVE_FEAT_DIM, n_moves: int = 4):
+        super().__init__()
+        self.state_dim, self.move_feat_dim, self.n_moves = state_dim, move_feat_dim, n_moves
+        self.backbone = nn.Sequential(
+            nn.Linear(state_dim, 256), nn.ReLU(), nn.Dropout(0.2),
+            nn.Linear(256, 128), nn.ReLU(), nn.Dropout(0.1),
+        )
+        self.value_head = nn.Sequential(
+            nn.Linear(128, 64), nn.ReLU(), nn.Linear(64, 1), nn.Sigmoid())
+        self.move_scorer = nn.Sequential(
+            nn.Linear(128 + move_feat_dim, 64), nn.ReLU(), nn.Linear(64, 1))
+        self.switch_scorer = nn.Sequential(
+            nn.Linear(128, 64), nn.ReLU(), nn.Linear(64, 1))
+
+    def forward(self, x):
+        state = x[:, :self.state_dim]
+        moves = x[:, self.state_dim:].reshape(-1, self.n_moves, self.move_feat_dim)  # [B,4,K]
+        h = self.backbone(state)                                                     # [B,128]
+        value = self.value_head(h)
+        h_rep = h.unsqueeze(1).expand(-1, self.n_moves, -1)                           # [B,4,128]
+        move_scores = self.move_scorer(torch.cat([h_rep, moves], dim=2)).squeeze(-1)  # [B,4]
+        switch_score = self.switch_scorer(h)                                          # [B,1]
+        return value, torch.cat([move_scores, switch_score], dim=1)                   # value, [B,5]
 
 
 def policy_loss(logits: torch.Tensor, actions: torch.Tensor) -> torch.Tensor:
@@ -98,7 +132,7 @@ def train(data_path: str, output_path: str, epochs: int = 50, batch_size: int = 
     Xtr, ytr, atr = torch.FloatTensor(X[tr]), torch.FloatTensor(y[tr]).unsqueeze(1), torch.LongTensor(a[tr])
     Xva, yva, ava = torch.FloatTensor(X[va]), torch.FloatTensor(y[va]).unsqueeze(1), torch.LongTensor(a[va])
 
-    model = DualNet(input_dim=X.shape[1])
+    model = DualNet2() if X.shape[1] == MOVED_DIM else DualNet(input_dim=X.shape[1])
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     bce = nn.BCELoss()
     loader = torch.utils.data.DataLoader(

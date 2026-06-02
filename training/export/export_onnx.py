@@ -8,17 +8,12 @@ import onnxruntime as ort
 import torch
 
 
-def export_to_onnx(model_path: str, output_path: str, input_dim: int = 245):
-    """Export DualNet to ONNX (two outputs) and validate against PyTorch.
+def export_to_onnx(model_path: str, output_path: str, input_dim: int = 265):
+    """Export a dual-head net to ONNX (two outputs) and validate against PyTorch.
+    input_dim 265 -> DualNet2 (per-move policy features); else DualNet."""
+    from train.train_model import DualNet, DualNet2, MOVED_DIM
 
-    Args:
-        model_path: Path to saved .pt DualNet state dict.
-        output_path: Where to write the .onnx file.
-        input_dim: Input feature dimension (default 245).
-    """
-    from train.train_model import DualNet
-
-    model = DualNet(input_dim=input_dim)
+    model = DualNet2() if input_dim == MOVED_DIM else DualNet(input_dim=input_dim)
     model.load_state_dict(torch.load(model_path, map_location="cpu", weights_only=True))
     model.eval()
 
@@ -60,5 +55,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Export ValueNet to ONNX")
     parser.add_argument("--model", default="models/value-net-v1.pt")
     parser.add_argument("--output", default="models/value-net-v1.onnx")
+    parser.add_argument("--input-dim", type=int, default=265)
     args = parser.parse_args()
-    export_to_onnx(args.model, args.output)
+    export_to_onnx(args.model, args.output, args.input_dim)
