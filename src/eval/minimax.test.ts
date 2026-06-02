@@ -66,12 +66,12 @@ function makeSnapshot(overrides?: Partial<BattleSnapshot>): BattleSnapshot {
   };
 }
 
-describe('search', () => {
-  it('returns scored options for available moves', () => {
+describe('search', async () => {
+  it('returns scored options for available moves', async () => {
     const snapshot = makeSnapshot();
     const model = makeOpponentModel('Blastoise', blastoiseSet);
 
-    const results = search(snapshot, model, defaultConfig);
+    const results = await search(snapshot, model, defaultConfig);
 
     expect(results.length).toBeGreaterThan(0);
     expect(results.length).toBeLessThanOrEqual(2);
@@ -84,12 +84,12 @@ describe('search', () => {
     }
   });
 
-  it('scores super-effective move higher than not-very-effective move', () => {
+  it('scores super-effective move higher than not-very-effective move', async () => {
     // Pikachu vs Blastoise: Thunderbolt is SE (Electric vs Water), Surf is NVE (Water vs Water)
     const snapshot = makeSnapshot();
     const model = makeOpponentModel('Blastoise', blastoiseSet);
 
-    const results = search(snapshot, model, defaultConfig);
+    const results = await search(snapshot, model, defaultConfig);
 
     const tboltResult = results.find(r => r.action.type === 'move' && r.action.id === 'thunderbolt');
     const surfResult = results.find(r => r.action.type === 'move' && r.action.id === 'surf');
@@ -99,12 +99,12 @@ describe('search', () => {
     expect(tboltResult!.score).toBeGreaterThan(surfResult!.score);
   });
 
-  it('normalizes scores: best=1.0, worst=0.0 when options differ', () => {
+  it('normalizes scores: best=1.0, worst=0.0 when options differ', async () => {
     // Pikachu vs Blastoise: Thunderbolt (SE) vs Surf (NVE) should produce different values
     const snapshot = makeSnapshot();
     const model = makeOpponentModel('Blastoise', blastoiseSet);
 
-    const results = search(snapshot, model, defaultConfig);
+    const results = await search(snapshot, model, defaultConfig);
 
     if (results.length >= 2) {
       const scores = results.map(r => r.score);
@@ -118,7 +118,7 @@ describe('search', () => {
     }
   });
 
-  it('assigns 0.5 to all options when scores are equal', () => {
+  it('assigns 0.5 to all options when scores are equal', async () => {
     // Use same move twice — both should produce identical minimax values
     const snapshot = makeSnapshot({
       player: {
@@ -132,14 +132,14 @@ describe('search', () => {
     });
     const model = makeOpponentModel('Blastoise', blastoiseSet);
 
-    const results = search(snapshot, model, defaultConfig);
+    const results = await search(snapshot, model, defaultConfig);
 
     for (const r of results) {
       expect(r.score).toBeCloseTo(0.5);
     }
   });
 
-  it('scores switches differently based on matchup', () => {
+  it('scores switches differently based on matchup', async () => {
     const snapshot = makeSnapshot({
       player: {
         active: makeMon({ species: 'Pikachu', level: 80, hp: 200, hpMax: 200, moves: ['Thunderbolt'] }),
@@ -155,7 +155,7 @@ describe('search', () => {
     });
     const model = makeOpponentModel('Blastoise', blastoiseSet);
 
-    const results = search(snapshot, model, defaultConfig);
+    const results = await search(snapshot, model, defaultConfig);
 
     expect(results.length).toBe(2);
     const ferroResult = results.find(r => r.action.type === 'switch' && r.action.species === 'Ferrothorn');
@@ -167,16 +167,16 @@ describe('search', () => {
     expect(ferroResult!.score).toBeGreaterThan(magResult!.score);
   });
 
-  it('returns empty array when no actions available', () => {
+  it('returns empty array when no actions available', async () => {
     const snapshot = makeSnapshot({ availableActions: [] });
     const model = makeOpponentModel('Blastoise', blastoiseSet);
 
-    const results = search(snapshot, model, defaultConfig);
+    const results = await search(snapshot, model, defaultConfig);
 
     expect(results).toHaveLength(0);
   });
 
-  it('respects topN config', () => {
+  it('respects topN config', async () => {
     const snapshot = makeSnapshot({
       availableActions: [
         { type: 'move', id: 'thunderbolt', name: 'Thunderbolt', pp: 24, maxPp: 24, target: 'normal', disabled: false },
@@ -186,8 +186,23 @@ describe('search', () => {
     });
     const model = makeOpponentModel('Blastoise', blastoiseSet);
 
-    const results = search(snapshot, model, { ...defaultConfig, topN: 2 });
+    const results = await search(snapshot, model, { ...defaultConfig, topN: 2 });
 
     expect(results.length).toBeLessThanOrEqual(2);
+  });
+
+  it('uses the injected leafEval to score leaves (drives the search)', async () => {
+    // leafEval that PREFERS the opponent keeping more HP — the opposite of the
+    // heuristic. The weaker move (Surf, NVE) leaves opp with more HP, so it must
+    // now rank above Thunderbolt (SE), proving the net-injection path drives play.
+    const snapshot = makeSnapshot();
+    const model = makeOpponentModel('Blastoise', blastoiseSet);
+    const leafEval = async (s: BattleSnapshot) => s.opponent.active.hp / 100;
+
+    const results = await search(snapshot, model, defaultConfig, leafEval);
+    const tbolt = results.find(r => r.action.type === 'move' && r.action.id === 'thunderbolt');
+    const surf = results.find(r => r.action.type === 'move' && r.action.id === 'surf');
+
+    expect(surf!.score).toBeGreaterThan(tbolt!.score);
   });
 });

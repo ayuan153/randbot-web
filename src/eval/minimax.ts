@@ -12,14 +12,21 @@ import { calculateDamage, DefenderOverrides } from './damage';
 import { getLikelyMoves, getMostLikelySet, getRemainingSetProbabilities } from './opponent-model';
 
 
+/** Async leaf evaluator: maps a leaf BattleSnapshot to a score in [-1,1]
+ *  (player advantage). Injected so the worker can blend a learned net in. */
+export type LeafEval = (snapshot: BattleSnapshot) => Promise<number>;
+
 /**
- * Run expectiminimax search and return scored options.
+ * Run expectiminimax search and return scored options. `leafEval` evaluates leaf
+ * states (defaults to the heuristic `evaluate`); the worker injects a net-blended
+ * evaluator in ML mode.
  */
-export function search(
+export async function search(
   snapshot: BattleSnapshot,
   opponentModel: OpponentModel,
   config: EvalConfig,
-): ScoredOption[] {
+  leafEval: LeafEval = (s) => Promise.resolve(evaluate(s)),
+): Promise<ScoredOption[]> {
   const startTime = Date.now();
   const actions = snapshot.availableActions;
   if (actions.length === 0) return [];
@@ -40,7 +47,7 @@ export function search(
 
     if (action.type === 'move') {
       // Simulate our move, then opponent's best response
-      minimaxValue = evaluateMove(snapshot, action, topOppMoves, config.depth - 1, opponentModel);
+      minimaxValue = await evaluateMove(snapshot, action, topOppMoves, config.depth - 1, opponentModel, leafEval);
       pv = [action.name];
 
       // Add opponent's best response to PV
@@ -49,7 +56,7 @@ export function search(
       }
     } else {
       // Switch: evaluate the resulting position
-      minimaxValue = evaluateSwitch(snapshot, action, topOppMoves, opponentModel);
+      minimaxValue = await evaluateSwitch(snapshot, action, topOppMoves, opponentModel, leafEval);
       pv = [`switch ${action.species}`];
     }
 
@@ -77,13 +84,14 @@ export function search(
 /**
  * Evaluate a move action: compute expected value considering opponent responses.
  */
-function evaluateMove(
+async function evaluateMove(
   snapshot: BattleSnapshot,
   action: MoveAction,
   oppMoves: Array<{ move: string; probability: number }>,
   depth: number,
   opponentModel: OpponentModel,
-): number {
+  leafEval: LeafEval,
+): Promise<number> {
   // Our move's weighted damage to opponent across possible sets
   const ourDmg = calculateWeightedDamage(
     snapshot.player.active,
@@ -96,7 +104,7 @@ function evaluateMove(
   if (depth <= 0 || oppMoves.length === 0) {
     // Leaf: evaluate resulting state after our move
     const resultState = applyDamage(snapshot, 'opponent', ourDmg.avgDmg, ourDmg.realMaxHP);
-    return evaluate(resultState);
+    return leafEval(resultState);
   }
 
   // Opponent node: weighted min over opponent moves
@@ -117,7 +125,7 @@ function evaluateMove(
     const afterOurMove = applyDamage(snapshot, 'opponent', ourDmg.avgDmg, ourDmg.realMaxHP);
     const afterBoth = applyDamage(afterOurMove, 'player', oppDmg.avgDmg, oppDmg.realMaxHP);
 
-    const value = evaluate(afterBoth);
+    const value = await leafEval(afterBoth);
     // Weight by probability, take minimum (opponent plays optimally)
     const weightedValue = value * oppMove.probability;
     if (weightedValue < worstValue) {
@@ -131,12 +139,13 @@ function evaluateMove(
 /**
  * Evaluate a switch action.
  */
-function evaluateSwitch(
+async function evaluateSwitch(
   snapshot: BattleSnapshot,
   action: { type: 'switch'; species: string; slot: number },
   oppMoves: Array<{ move: string; probability: number }>,
   opponentModel: OpponentModel,
-): number {
+  leafEval: LeafEval,
+): Promise<number> {
   // Find the pokemon we're switching to
   const switchIn = snapshot.player.bench.find(p => p.species === action.species);
   if (!switchIn) return -1;
@@ -148,7 +157,7 @@ function evaluateSwitch(
   };
 
   if (oppMoves.length === 0) {
-    return evaluate(newSnapshot);
+    return leafEval(newSnapshot);
   }
 
   // Opponent gets a free hit on our switch-in
@@ -164,7 +173,7 @@ function evaluateSwitch(
     );
 
     const afterHit = applyDamage(newSnapshot, 'player', oppDmg.avgDmg, oppDmg.realMaxHP);
-    const value = evaluate(afterHit) * oppMove.probability;
+    const value = (await leafEval(afterHit)) * oppMove.probability;
     if (value < worstValue) worstValue = value;
   }
 

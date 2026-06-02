@@ -132,6 +132,24 @@ a >1000-Elo offline anchor. Lower priority once live GXE exists.
   head. The **value head (0.67)** is the immediately useful artifact: wire it as the minimax leaf
   evaluator (it is currently unused in search) for a likely near-free strength bump.
 
+## Track 2 — make the net affect play
+### Checkpoint A: value net as the minimax leaf evaluator (done)
+Previously the learned net was only a metadata overlay; depth-2 expectiminimax scored leaves purely
+with the heuristic `evaluate`. Now:
+- `search()` is **async** and takes an injected `leafEval: (BattleSnapshot) => Promise<number>`
+  (default = the heuristic, so non-ML behavior is byte-for-byte unchanged — existing tests pass).
+- In ML mode the worker injects a **blended** leaf eval: `0.5·(winProb·2−1) + 0.5·heuristic`, scoring
+  each of the ~12–18 leaves with the learned net (rescaled win-prob → [−1,1]) **plus** the heuristic.
+- **Why blend, not replace:** the net is trained on real game states; minimax leaves are approximate
+  avg-damage sims, so the net can be out-of-distribution there. Blending guards against regressions; α
+  can be tuned once live ladder GXE exists. Branching is tiny (~12–18 leaves), so sequential `await`s
+  (~90 ms/turn) need no batching yet.
+- Files: `src/eval/minimax.ts` (async + `LeafEval`), `src/eval/eval-worker.ts` (blended injector +
+  kept root overlay). Test `minimax.test.ts` injects a leaf eval that inverts the heuristic ordering
+  to prove the net path drives play.
+- **Follow-ups:** switch the loaded model from `value-net-v1.onnx` to the imitation-dual value head
+  (0.67 vs 0.65, same 245 features); batch/cache leaf inferences; tune α; measure via live ladder GXE.
+
 ## Status
 - [x] Reframe + design (this doc)
 - [x] T1 policy-label extraction
