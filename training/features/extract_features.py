@@ -618,27 +618,33 @@ def process_replay(replay_data: dict) -> list[tuple[np.ndarray, float, int]]:
     return out
 
 
-def extract_from_directory(input_dir: str, output_path: str):
-    """Process all replay files and save as .npz."""
+def extract_from_directory(input_dir: str, output_path: str, min_rating: int = 0, limit: int = 0):
+    """Process replay files and save as .npz. Filters to games with rating >=
+    min_rating (replay JSON 'rating' field); stops after `limit` accepted files
+    (0 = no limit)."""
     input_path = Path(input_dir)
-    replay_files = list(input_path.glob("*.json"))
-
-    if not replay_files:
-        print(f"No replay files found in {input_dir}")
-        return
+    replay_files = input_path.glob("*.json")
 
     all_features = []
     all_labels = []
     all_actions = []
+    used = 0
 
     for filepath in tqdm(replay_files, desc="Extracting features"):
         try:
             data = json.loads(filepath.read_text())
+            if min_rating and (data.get("rating") or 0) < min_rating:
+                continue
             samples = process_replay(data)
+            if not samples:
+                continue
             for feat, label, action in samples:
                 all_features.append(feat)
                 all_labels.append(label)
                 all_actions.append(action)
+            used += 1
+            if limit and used >= limit:
+                break
         except (json.JSONDecodeError, KeyError, ValueError):
             continue
 
@@ -657,7 +663,8 @@ def extract_from_directory(input_dir: str, output_path: str):
     is_switch = actions == SWITCH_ACTION
     move_known = (actions >= 0) & (actions < 4)
     move_unknown = actions == MOVE_UNKNOWN
-    print(f"Saved {len(labels)} samples ({labels.mean():.2%} win rate) to {output_path}")
+    print(f"Saved {len(labels)} samples from {used} games "
+          f"({labels.mean():.2%} win rate) to {output_path}")
     print(f"  actions captured: {captured.mean():.1%}; of captured -> "
           f"switch {is_switch.sum()/max(1,captured.sum()):.1%}, "
           f"move {(move_known|move_unknown).sum()/max(1,captured.sum()):.1%} "
@@ -671,5 +678,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Extract features from replay logs")
     parser.add_argument("--input", default="data/replays")
     parser.add_argument("--output", default="data/training_data.npz")
+    parser.add_argument("--min-rating", type=int, default=0)
+    parser.add_argument("--limit", type=int, default=0, help="max accepted games (0=all)")
     args = parser.parse_args()
-    extract_from_directory(args.input, args.output)
+    extract_from_directory(args.input, args.output, args.min_rating, args.limit)
