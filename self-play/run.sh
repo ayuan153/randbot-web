@@ -37,6 +37,10 @@ BOOTSTRAP=${BOOTSTRAP:-0}
 EVAL_ONLY=${EVAL_ONLY:-0}
 # Where EVAL_ONLY reads iter_*.onnx from (SageMaker input channel by default).
 EVAL_MODELS_DIR=${EVAL_MODELS_DIR:-/opt/ml/input/data/models}
+# Per-baseline sim-server timeout (s). sim-server emits output only on completion,
+# so this must exceed the wall-clock for ELO_GAMES games (default 600 is fine for
+# the small ELO_GAMES used inline, but EVAL_ONLY runs hundreds of games).
+ELO_TIMEOUT=${ELO_TIMEOUT:-1500}
 
 ELO_SCRIPT="$(dirname "$TRAIN_SCRIPT")/elo_tracker.py"
 
@@ -57,6 +61,7 @@ if [ "$EVAL_ONLY" = "1" ]; then
         echo "=== Eval $name ==="
         python3 "$ELO_SCRIPT" --model mcts --games "$ELO_GAMES" --mcts-sims "$MCTS_SIMS" \
             --net "$onnx" \
+            --timeout "$ELO_TIMEOUT" \
             --output "$OUTPUT_DIR/models/elo_${name}.json" || echo "WARN: Elo eval failed for $name (non-fatal)"
     done
     if [ -d /opt/ml/model ]; then

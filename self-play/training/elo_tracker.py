@@ -32,8 +32,13 @@ def compute_elo(wins: int, losses: int, draws: int = 0, opponent_elo: int = 1000
 
 
 def play_matches(model_path: str | None, baseline: str, num_games: int = 100,
-                 mcts_sims: int = 16, net: str | None = None) -> dict:
-    """Play model vs baseline using the sim server. Returns {wins, losses, draws}."""
+                 mcts_sims: int = 16, net: str | None = None, timeout: int = 600) -> dict:
+    """Play model vs baseline using the sim server. Returns {wins, losses, draws}.
+
+    sim-server writes its JSONL output in a single writeFileSync at the end, so a
+    subprocess timeout discards ALL completed games (-> 0/0/0 -> anchor Elo). The
+    timeout must therefore be large enough for `num_games` to finish; size it via
+    --timeout for high game counts (e.g. low-noise eval at 300+ games)."""
     cmd = [
         'node', '--import', 'tsx',
         str(SELF_PLAY_DIR / 'sim' / 'sim-server.ts'),
@@ -47,7 +52,7 @@ def play_matches(model_path: str | None, baseline: str, num_games: int = 100,
     if net:
         cmd.extend(['--net', net])
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=600,
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout,
                                 cwd=str(SELF_PLAY_DIR))
         # Parse JSONL output — each line has {winner, numTurns, ...}
         wins = losses = draws = 0
@@ -73,17 +78,17 @@ def play_matches(model_path: str | None, baseline: str, num_games: int = 100,
         return {'wins': 0, 'losses': 0, 'draws': 0}
 
 def track_elo(model_path: str | None, num_games: int = 200, mcts_sims: int = 16,
-              net: str | None = None) -> dict:
+              net: str | None = None, timeout: int = 600) -> dict:
     """Run Elo evaluation for a model against baselines."""
     results = {}
 
     # Play against random baseline (anchored at Elo 800)
-    random_results = play_matches(model_path, 'random', num_games, mcts_sims, net)
+    random_results = play_matches(model_path, 'random', num_games, mcts_sims, net, timeout)
     random_elo = compute_elo(random_results['wins'], random_results['losses'], opponent_elo=800)
     results['vs_random'] = {'elo': random_elo, **random_results}
 
     # Play against heuristic baseline (anchored at Elo 1000)
-    heuristic_results = play_matches(model_path, 'heuristic', num_games, mcts_sims, net)
+    heuristic_results = play_matches(model_path, 'heuristic', num_games, mcts_sims, net, timeout)
     heuristic_elo = compute_elo(
         heuristic_results['wins'], heuristic_results['losses'], opponent_elo=1000
     )
@@ -102,9 +107,12 @@ if __name__ == '__main__':
     parser.add_argument('--mcts-sims', type=int, default=16, help='MCTS simulations per move')
     parser.add_argument('--net', default=None, help='ONNX net path for net-backed MCTS')
     parser.add_argument('--output', default='elo_results.json', help='Output JSON path')
+    parser.add_argument('--timeout', type=int, default=600,
+                        help='Per-baseline sim-server subprocess timeout (s). Raise for '
+                             'high --games (sim-server emits output only on completion).')
     args = parser.parse_args()
 
-    results = track_elo(args.model, args.games, args.mcts_sims, args.net)
+    results = track_elo(args.model, args.games, args.mcts_sims, args.net, args.timeout)
     Path(args.output).write_text(json.dumps(results, indent=2))
     print(f"Estimated Elo: {results['estimated_elo']:.0f}")
     for baseline, data in results.items():
