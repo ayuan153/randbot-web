@@ -113,11 +113,31 @@ a >1000-Elo offline anchor. Lower priority once live GXE exists.
 - Eval is CPU-bound (see experiments doc) — run training/eval on CPU/GPU as available, never assume a
   g4dn is needed for eval.
 
+## Results — v1 (100K games ≥1500)
+- **Data:** 5.01M samples from 100K gen9randombattle games rated ≥1500 (median ~1626). 95.6% of
+  decisions captured; 75.8% move / 24.2% switch; 25.8% of moves slot-resolved (~0.94M move-slot
+  labels). Move-slot distribution uniform `[249k,240k,229k,220k]`.
+- **Training:** DualNet (245→256→128 + heads), 20 epochs, batch 1024, policy_weight 0.5, save-best by
+  (win-acc + move-top1). `models/imitation-dual-v1.onnx` (+`.data`); outputs `win_probability` +
+  `policy_logits[5]`.
+- **Held-out proxy metrics:**
+  - win-prediction: **0.636 → 0.670** (slightly above the prior value net's ~0.65).
+  - move top-1: **0.290 → 0.302** (vs 0.25 random) — a real but **weak** imitation signal.
+  - move/switch argmax = 0.66: a **metric artifact** (move probability is split across 4 slots, so a
+    5-way argmax over-picks switch); not a true move-vs-switch accuracy.
+- **Key insight (drives Track 2):** the policy head is fed only the 245 **state** features — it never
+  sees the candidate moves' attributes (type / BP / effectiveness vs the current foe). So it cannot
+  strongly discriminate *which* of the 4 moves a human picked; ~0.30 top-1 is close to the ceiling for
+  state-only input. Track 2 should feed **per-move features** (encode each legal move) to the policy
+  head. The **value head (0.67)** is the immediately useful artifact: wire it as the minimax leaf
+  evaluator (it is currently unused in search) for a likely near-free strength bump.
+
 ## Status
 - [x] Reframe + design (this doc)
-- [ ] T1 policy-label extraction
-- [ ] T1 dual-head net + training (val/early-stop/save-best)
-- [ ] T1 train + report win-pred & move-match
-- [ ] T1 export dual-head ONNX
-- [ ] T0 live ladder client + GXE logging
-- [ ] (opt) T0 strong local anchor
+- [x] T1 policy-label extraction
+- [x] T1 dual-head net + training (val/early-stop/save-best)
+- [x] T1 train + report win-pred & move-match (v1: 0.67 / 0.30 — see Results)
+- [x] T1 export dual-head ONNX (`models/imitation-dual-v1.onnx`)
+- [x] T0 ladder client (`ladder/`, core unit-tested) — needs a registered account to run live
+- [ ] T0 strong local anchor (deferred; live ladder GXE is the real anchor)
+- [ ] Track 2: per-move features for the policy head; wire value net as the minimax leaf eval
