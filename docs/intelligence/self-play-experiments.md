@@ -74,6 +74,57 @@ is iteration i's freshly-trained `iter_i.onnx`. Elo is from 30 games/baseline un
 - Result: ❌ no SUSTAINED climb — high-variance oscillation (range ~210), final (870) below first (947). Representation bottleneck is resolved (loss 0.77->0.18) and the net reached 1080 at one iter, but no monotonic learning curve.
 - Lessons: (a) the 225-feature representation IS learnable (loss collapse) — so representation was a real bottleneck and is now lifted; (b) the experiment is UNDERPOWERED to detect a climb: 30-game eval carries +-60-90 Elo noise, so the 5-point range (~210) is consistent with pure noise around a ~950-1000 mean; (c) the trainer fresh-initializes the net each iter and data grows only 150->750, so the 5 Elo points are ~independent noisy (net, eval) samples, NOT a learning curve; (d) iter5's drop may also be overfitting/forgetting on the 750-game set. Next levers: low-noise eval (hundreds of games per baseline; e.g. an eval-only job over the saved iter_*.onnx, since a full 5-iter run can't fit high ELO_GAMES under the 7200s cap with serial eval); a proper data-volume learning curve (150 vs 1k vs 5k games); warm-start or train/val early-stopping.
 
+### Tier 2 low-noise eval — Phase A gate: does more data help? (local CPU eval)
+- Goal: re-eval the saved Tier 2 nets at LOW noise (300 games/baseline, 95% CI ±~40 Elo/baseline) to
+  test whether strength rises with training data BEFORE committing big compute. Each `iter_i` was
+  fresh-init trained on accumulated `i×150` games, so iter_1/3/5 = **150/450/750-game** data points (a
+  data-volume sweep — but confounded with init seed; see caveat).
+- Tooling: added `EVAL_ONLY` mode to `run.sh` (commit `212ef2d`) — skips self-play+train, runs
+  `elo_tracker` over a supplied set of `*.onnx` (SageMaker input channel `models`). Found+fixed a
+  latent bug (commit `ea2f966`): `elo_tracker` ran `sim-server` with a hardcoded **600s** subprocess
+  timeout, and `sim-server` emits its JSONL only via a single `writeFileSync` at completion, so ANY
+  timeout discards ALL finished games → 0/0/0 → anchor Elo. Added a `--timeout` arg (default 600
+  unchanged for the inline 30-game loop; `ELO_TIMEOUT` for EVAL_ONLY).
+- **g4dn is infeasible for low-noise eval:** two EVAL_ONLY jobs (per-baseline timeout 600s, then
+  1500s) BOTH returned 0-game anchors — 300 games/baseline needs **>1500s** on `g4dn.xlarge`. Root
+  cause: eval is **CPU-bound** (onnxruntime-node runs on CPU; the T4 GPU is unused) and `--workers 4`
+  oversubscribes the 4 vCPU → ~5s/game; 3 nets × 2 baselines ≈ 9000s **> the 7200s job cap**, and with
+  no incremental flush there is no salvage. Pivoted the *measurement* to **local CPU** (~1.3s/game,
+  10 cores, uncapped): 3 nets at 300 games in ~25 min (parallel). EVAL_ONLY mode stays valid for
+  Phase-B cloud scale-out.
+- Results (300 games/baseline; W-L-D; 95% CI ±~40 Elo/baseline):
+
+  | net | train games | vs_random | vs_heuristic | estimated |
+  |-----|-------------|-----------|--------------|-----------|
+  | iter_1 | 150 | 942.8 (207-91-2) | 1063.1 (174-121-3) | 1002.9 |
+  | iter_3 | 450 | 948.3 (209-89-2) | 1103.0 (190-105-5) | 1025.7 |
+  | iter_5 | 750 | 934.7 (202-93-5) | 1008.2 (151-144-4) | **971.5** |
+
+- **vs_random is FLAT:** 943 / 948 / 935 — spread **13 Elo**, all within a single CI; no data trend.
+  (Cf. the 30-game numbers 947 / 976 / 870, spread 106 → low-noise eval collapsed the spread ~8×,
+  **confirming the 30-game deltas were pure noise**; the iter-4 "1080 peak" and iter-5 "870 collapse"
+  were artifacts.)
+- **vs_heuristic:** iter_3 (1103) ≈ iter_1 (1063) > iter_5 (1008). The MOST-data net (iter_5, 750
+  games) is the WEAKEST: iter_3 > iter_5 is significant (Δscore 0.13 ≈ 3.3 SE, p<0.001); iter_1 >
+  iter_5 marginal (~1.9 SE). estimated: iter_3 > iter_1 > iter_5.
+- **GATE = ❌ FLAT/NEGATIVE.** Strength does NOT rise monotonically with data (150→750); the most-data
+  net is the weakest. This is the handoff's "diagnose, don't spend" branch — **DO NOT commit big
+  compute on the current bootstrap setup.**
+- Caveat: nets are fresh-init per iter, so data volume is confounded with random seed. This rules out
+  a LARGE data effect (>~50 Elo over the range) but a clean isolation needs a fixed-seed/warm-start
+  sweep.
+- **Leading root cause:** bootstrap self-play data is **heuristic-generated** (no net in the self-play
+  hot loop), so training is **behavioral cloning of the heuristic** with a fixed quality ceiling — the
+  net captures the heuristic by ~150 games (vs_heuristic ~50-64%, i.e. net ≈ heuristic) and more of
+  the same-distribution data can't push it past the demonstrator. More data of *this kind* cannot
+  compound. Secondary: last-net-saved (no best-net / val / early-stop) + fresh-init adds seed variance
+  (the iter_5 dip).
+- **Next (cheap, local-first) before any big compute:** (a) closed-loop signal — net-in-the-loop
+  self-play so data quality improves with the net (the actual RL lever, not more heuristic data);
+  (b) compounding training — warm-start + train/val split + early stopping + **SAVE BEST net**;
+  (c) re-run this gate in the closed-loop setting; (d) only then scale (Phase B: actor/learner split,
+  quota increase, bigger net).
+
 ## Cross-run takeaways
 
 1. **Plumbing is solid:** loop closes, Elo logs, models export (`iter_1..5.onnx` + `checkpoint.pt` +
@@ -86,6 +137,7 @@ is iteration i's freshly-trained `iter_i.onnx`. Elo is from 30 games/baseline un
 5. Throughput is solvable but was never the real blocker for learning. The net-eval cache (Tier 1.5) doubled net-game completion and a net game runs in 2.7s locally; bootstrap (heuristic self-play) eliminates self-play timeouts entirely. Neither made Elo climb.
 6. CONFIRMED binding constraint = the 20-feature representation, not throughput or volume. The bootstrap run gave the net clean, growing, full-volume data (150→750 games) with zero dropped games, and vs_random Elo still declined (1125→800). The coarse features (~5 unique vectors/move) cap what any net can learn; more data collapses it toward base rates. Next real lever is Tier 2 feature unification (245-feature src/eval/features.ts), then growing the net.
 7. Representation was a genuine bottleneck but not the last one. The 225-feature extractor cut training loss 0.77->0.18 and the net reached 1080 vs_random at one iteration (above the heuristic ceiling), yet no run shows a SUSTAINED climb. The binding constraint is now EVAL SIGNAL-TO-NOISE and experiment design: 30-game eval (+-60-90 Elo) cannot resolve a plausible-size improvement, and fresh-init + 150->750 data is not a learning curve. Next: low-noise eval over saved nets + a real data-volume sweep.
+8. **Low-noise eval settled it: more bootstrap data does NOT help (gate failed).** At 300 games/baseline the iter_1/3/5 nets (150/450/750 games) are flat on vs_random (943/948/935, spread 13 Elo) and the most-data net is the *weakest* on vs_heuristic — confirming the prior runs' apparent climbs/collapses were eval noise. The real blocker is now **data quality, not quantity**: bootstrap data is behavioral cloning of the heuristic (no net in the self-play loop), which plateaus at the demonstrator's level. The next lever is a **closed learning loop** (net-in-the-loop self-play + compounding/best-net training), re-gated at low noise, BEFORE big compute. Also: **eval is CPU-bound — run it locally or on CPU instances, not g4dn**, and it needs incremental output flush to be cap-safe at scale.
 
 ## Cost/time notes
 - A 5-iter run is ~$0.40-0.50 and ~55-107 min depending on games/iter.
