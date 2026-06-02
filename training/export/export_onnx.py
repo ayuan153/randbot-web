@@ -8,17 +8,17 @@ import onnxruntime as ort
 import torch
 
 
-def export_to_onnx(model_path: str, output_path: str, input_dim: int = 206):
-    """Export ValueNet to ONNX and validate output matches PyTorch.
+def export_to_onnx(model_path: str, output_path: str, input_dim: int = 245):
+    """Export DualNet to ONNX (two outputs) and validate against PyTorch.
 
     Args:
-        model_path: Path to saved .pt model state dict.
+        model_path: Path to saved .pt DualNet state dict.
         output_path: Where to write the .onnx file.
-        input_dim: Input feature dimension (default 206).
+        input_dim: Input feature dimension (default 245).
     """
-    from train.train_model import ValueNet
+    from train.train_model import DualNet
 
-    model = ValueNet(input_dim=input_dim)
+    model = DualNet(input_dim=input_dim)
     model.load_state_dict(torch.load(model_path, map_location="cpu", weights_only=True))
     model.eval()
 
@@ -30,26 +30,28 @@ def export_to_onnx(model_path: str, output_path: str, input_dim: int = 206):
         dummy_input,
         output_path,
         input_names=["state"],
-        output_names=["win_probability"],
-        dynamic_axes={"state": {0: "batch_size"}},
+        output_names=["win_probability", "policy_logits"],
+        dynamic_axes={"state": {0: "batch_size"},
+                      "win_probability": {0: "batch_size"},
+                      "policy_logits": {0: "batch_size"}},
         opset_version=17,
     )
 
-    # Validate ONNX model
     onnx_model = onnx.load(output_path)
     onnx.checker.check_model(onnx_model)
 
-    # Test inference matches PyTorch
+    # Test inference matches PyTorch (both heads)
     sess = ort.InferenceSession(output_path)
     test_input = np.random.randn(1, input_dim).astype(np.float32)
-    onnx_out = sess.run(None, {"state": test_input})[0]
+    onnx_val, onnx_pol = sess.run(None, {"state": test_input})
 
     with torch.no_grad():
-        torch_out = model(torch.FloatTensor(test_input)).numpy()
+        torch_val, torch_pol = model(torch.FloatTensor(test_input))
 
-    assert np.allclose(onnx_out, torch_out, atol=1e-5), "ONNX output doesn't match PyTorch!"
+    assert np.allclose(onnx_val, torch_val.numpy(), atol=1e-5), "value output mismatch!"
+    assert np.allclose(onnx_pol, torch_pol.numpy(), atol=1e-5), "policy output mismatch!"
     print(f"Exported to {output_path} ({os.path.getsize(output_path) / 1024:.1f} KB)")
-    print("Validation passed. Output matches PyTorch within 1e-5.")
+    print(f"Validation passed. value+policy match PyTorch within 1e-5. policy_dim={onnx_pol.shape[-1]}")
 
 
 if __name__ == "__main__":
