@@ -174,5 +174,18 @@ leaf eval). Same 100K games ≥1500, 5.0M samples, 20 epochs.
 - [ ] T0 strong local anchor (deferred; live ladder GXE is the real anchor)
 - [x] Track 2A: value net wired as the minimax leaf evaluator (blended)
 - [x] Track 2B: per-move features for the policy head (move top-1 0.30→0.35)
-- [ ] Track 2C (next): emit per-move features in `src/eval/features.ts` + wire the policy as a
-      search prior with switch-target lookahead; swap leaf-eval to the imitation value head; ladder GXE
+- [x] Track 2C: per-move features in TS (265-d), policy wired as root prior, model shipped in
+      extension build — **COMPLETE** (2026-06-02). Only live ladder GXE unmeasured.
+- [ ] Track 2C step 4: live ladder GXE (blocked on registered PS account)
+
+### 2026-06-02 — imitation-dual-v2 retrained + shipped
+**Critical fix:** Python feature pipeline's lookup tables were ~70% incomplete (SPECIES_TYPES 148/876,
+MOVE_BASE_POWERS 106/685) — the majority of species/moves fell through to wrong defaults, corrupting
+training features for both the value net and imitation-dual-v2. Regenerated complete tables from
+`@pkmn/data` gen9; re-extracted 5.01M samples; retrained 20 epochs.
+
+**Retrained held-out metrics:** win_acc **0.671**, move_top1 **0.400** (previously 0.35 on corrupt
+data). The model is now wired into the bot as both the leaf value evaluator and a root policy prior
+(POLICY_BLEND=0.7, legal-masked, NaN-guarded). TS↔Python feature parity verified exact.
+
+**Remaining:** live ladder GXE (no measurement yet; blocked on registered account).

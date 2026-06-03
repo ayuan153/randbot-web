@@ -6,3 +6,12 @@ dist/
 .builder-mcp/
 packageInfo
 models/*.onnx
+
+# agent + local artifacts
+.yolo-sisyphus/
+models/*.bak
+# local credentials / env (never commit)
+.env.*
+# pre-existing self-play scratch outputs
+self-play/checkpoint.pt
+self-play/output/

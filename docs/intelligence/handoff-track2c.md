@@ -6,10 +6,23 @@
 2. [`self-play-experiments.md`](./self-play-experiments.md) — the gate result that triggered the reframe (self-play is deprioritized)
 
 ## One-line state
-A dual-head **value+policy** imitation net is trained (`models/imitation-dual-v2.onnx`, held-out
-win-pred **0.67**, move top-1 **0.35**) and the value head is wired as the search leaf evaluator —
-**but** the net isn't shipped/used in the real bot yet, and there is **no live ladder number**. 2C
-closes that gap.
+Steps 0–3 **COMPLETE** and shipped; only Step 4 (live ladder GXE) remains. The imitation-dual-v2 net
+(retrained, held-out win-pred **0.671**, move top-1 **0.400**) is shipped in the built extension as
+both the leaf value evaluator and a root policy prior. No live ladder GXE measured yet.
+
+---
+
+## UPDATE (this session — 2026-06-02)
+
+- **Step 0 (ship model weights):** `post-build.mjs` now copies `*.onnx` AND `*.onnx.data` (weights sidecar was previously dropped). Verified `dist/models/` ships both.
+- **Step 1 (per-move features in TS):** `features.ts` FEATURE_COUNT 245→265; `computeMoveBlock` + `writeMoveFeatures` append the 4×5 per-move block sourced from the player's REVEALED moveset (`snapshot.player.active.moves` = Python `moves_known`), deduped+sorted by `toID`. New parity test `src/eval/features.move-parity.test.ts`.
+- **CRITICAL FINDING + FIX:** Python feature pipeline lookup tables were catastrophically incomplete (MOVE_BASE_POWERS 106 entries, SPECIES_TYPES 148 entries; ~71% of species and ~51% of moves in real replays fell through to wrong defaults `Normal`/`80`/`['Normal']`). The 245 STATE features used these too, so BOTH the value net and imitation-dual-v2 had been trained on largely-wrong type/power data. **Fix:** `scripts/gen-data-tables.mjs` regenerates complete tables from `@pkmn/data` gen9 → `training/features/data/{species_types.json (876), move_base_powers.json (685)}`; `base_stats.py` now json-loads them with id-normalized lookups. TS↔Python parity now exact (all parity cases green).
+- **Retrain:** re-extracted 5,013,284 samples from 100K games, trained 20 epochs (batch 1024, policy-weight 0.5), exported 265-d ONNX to `models/imitation-dual-v2.onnx` (+ `.onnx.data`). Held-out: win_acc **0.671**, move_top1 **0.400** (up from 0.35 on the old garbage-trained net). Old model backed up to `models/imitation-dual-v2.onnx{,.data}.bak`.
+- **Step 2 (load v2 + read policy):** `eval-worker.ts` MODEL_PATH → `imitation-dual-v2.onnx`; `learned-eval.ts` adds `evaluateWithPolicy(snapshot) → {winProb, policy[5]}` reading `results['policy_logits']`.
+- **Step 3 (policy as search prior):** `src/eval/policy-prior.ts` blends a single root-call, softmaxed, legal-masked policy prior into move ranking (POLICY_BLEND=0.7; slots 0–3 = moves sorted by `toID`, slot 4 = switch; NaN-guarded; ml-mode only, heuristic path unchanged). Tests in `src/eval/policy-prior.test.ts`.
+- **Verification:** `npm run lint` exit 0; `npm test` 98/98 exit 0 (one flaky `@pkmn/sim` timing test, green on rerun); `npm run build` exit 0; reviewer APPROVE.
+
+---
 
 ## What's built (on `main`, scope `eval`/`training`/`ladder`, newest first)
 - `74d857f` imitation-dual-v2 (per-move policy) — move-match 0.30→0.35
@@ -35,13 +48,13 @@ closes that gap.
 
 ## Task — Track 2C (in order)
 
-### 0. [BLOCKER, 1 line] Ship model weights
+### 0. [DONE] Ship model weights
 `scripts/post-build.mjs:~50` copies only `*.onnx`, NOT `*.onnx.data`. So the learned net's weights
 never reach the built extension and ml mode silently falls back to heuristic (this also makes Track
 2A's wiring inert in the build). Fix: `file.endsWith('.onnx') || file.endsWith('.onnx.data')`. Build
 and confirm both files land in the extension's `models/` output.
 
-### 1. Emit per-move features in `src/eval/features.ts`
+### 1. [DONE] Emit per-move features in `src/eval/features.ts`
 `FEATURE_COUNT = 245` → **265**. After `writeFutilityFeatures(...)` (≈line 107) and before `return f`,
 append the 4×5 block. Helpers already in this file: `getMoveTypePower(name)→[type,bp]`,
 `typeEffectiveness(atk,defTypes)`, `getTypes(species)`, `PRIORITY_MOVES: Set`. Use
@@ -52,20 +65,26 @@ append the 4×5 block. Helpers already in this file: `getMoveTypePower(name)→[
   the same state, diff the last 20 features. A silent mismatch makes the net out-of-distribution.
 - Update the feature-count test (`src/eval/features.test.ts` if present) to 265.
 
-### 2. Load v2 + read the policy
+### 2. [DONE] Load v2 + read the policy
 - `eval-worker.ts:14` `MODEL_PATH` → `'models/imitation-dual-v2.onnx'`.
 - `learned-eval.ts`: tensor shape `[1, 265]`; add `evaluateWithPolicy(snapshot)` returning
   `{ winProb, policy: Float32Array /*5*/ }` (read `results['policy_logits']`). The existing blended
   leaf eval (Track 2A) keeps using `win_probability` — leaf states are now 265-featured automatically.
 
-### 3. Use the policy as a search prior
+### 3. [DONE] Use the policy as a search prior
 One net call on the **root** 265-vector → softmax the legal-masked logits. Map policy slot→action via
 sorted-id (`ladder/protocol.ts:policyMoveOrder` shows the exact mapping; mask illegal moves to −∞).
 Blend into the final ranking, e.g. `final = β·searchScore + (1−β)·policyProb` (β tunable, start ~0.7).
 Switches: `policy[4]` = P(switch); the switch **target** is already handled by the search's per-switch
 value eval. Keep it minimal; add a unit test that the prior shifts ranking as expected.
 
-### 4. Measure on the real ladder (the north-star number)
+### 4. [REMAINING] Measure on the real ladder (the north-star number)
+**BLOCKED** on a registered Pokémon Showdown account (`PS_USERNAME`/`PS_PASSWORD`) for
+`ladder/client.ts`, OR manual play reading `ratings.gen9randombattle.gxe` from the user's account
+JSON. The automated path still needs the ~150–200 line protocol state accumulator (track opponent
+active/bench, field, hazards, boosts from `|switch|`/`|-weather|`/`|-sidestart|`/`|-boost|`… lines)
+to construct a `BattleSnapshot` in Node from raw protocol.
+
 Two paths:
 - **Quick:** build, load the extension, play `gen9randombattle` on a registered account manually, then
   read `ratings.gen9randombattle.gxe` from `https://pokemonshowdown.com/users/<id>.json`.
