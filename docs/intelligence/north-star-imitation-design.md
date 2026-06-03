@@ -176,7 +176,7 @@ leaf eval). Same 100K games ≥1500, 5.0M samples, 20 epochs.
 - [x] Track 2B: per-move features for the policy head (move top-1 0.30→0.35)
 - [x] Track 2C: per-move features in TS (265-d), policy wired as root prior, model shipped in
       extension build — **COMPLETE** (2026-06-02). Only live ladder GXE unmeasured.
-- [ ] Track 2C step 4: live ladder GXE (blocked on registered PS account)
+- [x] Track 2C step 4: live ladder GXE — **DONE** (2026-06-03). GXE 30.4, Elo ~1062, 11W-24L.
 
 ### 2026-06-02 — imitation-dual-v2 retrained + shipped
 **Critical fix:** Python feature pipeline's lookup tables were ~70% incomplete (SPECIES_TYPES 148/876,
@@ -189,3 +189,13 @@ data). The model is now wired into the bot as both the leaf value evaluator and 
 (POLICY_BLEND=0.7, legal-masked, NaN-guarded). TS↔Python feature parity verified exact.
 
 **Remaining:** live ladder GXE (no measurement yet; blocked on registered account).
+
+### 2026-06-03 — First real ladder GXE measurement
+First real ladder GXE: **30.4** (Elo ~1062, 11W-24L, rprd 56.7) for imitation-dual-v2 + depth-2
+search + policy prior — well below average (50 GXE ≈ average). Likely a slight under-estimate due to a
+now-fixed disconnect-forfeit bug (WebSocket ping/pong watchdog false-killed connections every ~70s,
+forfeiting in-progress games). Clean re-run blocked by PS proxy-lock on datacenter IPs (needs
+residential IP).
+
+**Takeaway:** validates the need for a stronger net and/or deeper search — the current imitation model
+is far from competitive, even accounting for the forfeit bug.

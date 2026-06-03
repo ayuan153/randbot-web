@@ -6,9 +6,9 @@
 2. [`self-play-experiments.md`](./self-play-experiments.md) — the gate result that triggered the reframe (self-play is deprioritized)
 
 ## One-line state
-Steps 0–3 **COMPLETE** and shipped; only Step 4 (live ladder GXE) remains. The imitation-dual-v2 net
-(retrained, held-out win-pred **0.671**, move top-1 **0.400**) is shipped in the built extension as
-both the leaf value evaluator and a root policy prior. No live ladder GXE measured yet.
+Steps 0–4 **COMPLETE**. First live ladder GXE measured: **30.4** (Elo ~1062, 11W-24L/35 games, rprd
+56.7 = settled). Well below average (50 GXE). Likely a slight under-estimate due to a now-fixed
+disconnect-forfeit bug. **Clean re-measurement blocked** by PS proxy-lock on datacenter IPs.
 
 ---
 
@@ -78,22 +78,25 @@ Blend into the final ranking, e.g. `final = β·searchScore + (1−β)·policyPr
 Switches: `policy[4]` = P(switch); the switch **target** is already handled by the search's per-switch
 value eval. Keep it minimal; add a unit test that the prior shifts ranking as expected.
 
-### 4. [REMAINING] Measure on the real ladder (the north-star number)
-**BLOCKED** on a registered Pokémon Showdown account (`PS_USERNAME`/`PS_PASSWORD`) for
-`ladder/client.ts`, OR manual play reading `ratings.gen9randombattle.gxe` from the user's account
-JSON. The automated path still needs the ~150–200 line protocol state accumulator (track opponent
-active/bench, field, hazards, boosts from `|switch|`/`|-weather|`/`|-sidestart|`/`|-boost|`… lines)
-to construct a `BattleSnapshot` in Node from raw protocol.
+### 4. [DONE] Measure on the real ladder (the north-star number)
+**Result (2026-06-03):** The automated ladder harness (`ladder/client.ts` + `battle-state.ts` +
+`bot-selector.ts` + `net-node.ts`) drove imitation-dual-v2 + depth-2 search + policy prior on
+gen9randombattle under account **'Beepity'**. After 35 rated games
+(pokemonshowdown.com/users/beepity.json):
+- **GXE 30.4**, Elo ~1062 (rpr 1342.6, rprd 56.7 = settled, not provisional)
+- Record: 11W-24L (~31% win rate)
+- **Conclusion:** well below average ladder level (50 GXE ≈ average).
 
-Two paths:
-- **Quick:** build, load the extension, play `gen9randombattle` on a registered account manually, then
-  read `ratings.gen9randombattle.gxe` from `https://pokemonshowdown.com/users/<id>.json`.
-- **Automated (bigger):** make `ladder/client.ts` drive the trained bot. The gap: `ladder/` only
-  parses `|request|` today; `search()` needs a `BattleSnapshot`. `src/state/snapshot.ts` builds one
-  from the **page** `battle` object, not from raw protocol — so you must add a **protocol state
-  accumulator** (~150-200 lines: track opponent active/bench, field, hazards, boosts from
-  `|switch|`/`|-weather|`/`|-sidestart|`/`|-boost|`… lines) to construct a `BattleSnapshot` in Node.
-  Player side + actions come straight from `|request|`. Then plug `chooseAction` = search + net.
+**Caveat — likely a slight under-estimate:** the first watchdog implementation used WebSocket ping/pong
+for liveness, but PS does not reply to ws ping frames, so it false-killed live connections every ~70s
+and forfeited some in-progress games as losses. Fixed in a later commit (message-based 240s silence
+watchdog + reconnect backoff).
+
+**BLOCKER for clean re-measurement:** this run executed on an AWS/datacenter IP (e.g. 15.248.6.12),
+which PS auto-locks as a 'proxy' (login succeeds but the user is name-locked '※Beepity' and cannot
+search rated games). The overnight reconnect storm on the datacenter IP likely triggered/enforced it.
+**A clean re-measurement requires running the harness from a RESIDENTIAL IP** (e.g. the user's home
+machine) or appealing the PS lock. No code change can bypass a PS IP-lock.
 
 ## Commands
 ```bash
