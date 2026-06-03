@@ -15,10 +15,18 @@ import WebSocket from 'ws';
 import {
   BattleRequest, Choice, chooseDefault, parseLoginResponse, parseLadderRating,
 } from './protocol';
+import { loadNet } from './net-node';
+import { BattleStateTracker } from './battle-state';
+import { selectAction } from './bot-selector';
+import { setSetsDb } from '../src/state/sets-db';
+import { readFileSync } from 'fs';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
 
 const WS_URL = 'wss://sim3.psim.us/showdown/websocket';
 const LOGIN_URL = 'https://play.pokemonshowdown.com/api/login';
 const FORMAT = 'gen9randombattle';
+const DECISION_THROTTLE_MS = 600;
 
 export type Selector = (req: BattleRequest) => Choice | null;
 
@@ -33,6 +41,8 @@ export class LadderClient {
   private stats: Stats = { wins: 0, losses: 0, ties: 0 };
   private currentRoom: string | null = null;
   private done = false;
+  private trackers: Map<string, BattleStateTracker> = new Map();
+  private lastChoiceTime = 0;
 
   constructor(username: string, password: string, targetGames = 20, select: Selector = chooseDefault) {
     this.username = username;
@@ -60,18 +70,26 @@ export class LadderClient {
       const parts = line.split('|');
       const cmd = parts[1];
 
+      // Feed every line to the room's tracker
+      const trackRoom = room || this.currentRoom || '';
+      if (trackRoom && this.trackers.has(trackRoom)) {
+        this.trackers.get(trackRoom)!.ingest(line);
+      }
+
       if (cmd === 'challstr') {
         await this.login(parts.slice(2).join('|'));
       } else if (cmd === 'updateuser' && parts[3] === '1') {
         this.send(`|/search ${FORMAT}`);
       } else if (cmd === 'init' && parts[2] === 'battle') {
         this.currentRoom = room;
+        this.trackers.set(room, new BattleStateTracker(this.username));
       } else if (cmd === 'request' && parts[2]) {
-        this.handleRequest(room || this.currentRoom || '', parts.slice(2).join('|'));
+        await this.handleRequest(room || this.currentRoom || '', parts.slice(2).join('|'));
       } else if (cmd === 'error' && room) {
         console.warn('[battle] choice error:', parts.slice(2).join('|'));
       } else if (cmd === 'win' || cmd === 'tie') {
         await this.onBattleEnd(room, cmd, parts[2]);
+        this.trackers.delete(room);
         if (this.stats.wins + this.stats.losses + this.stats.ties >= this.targetGames) {
           this.done = true;
           this.ws.close();
@@ -95,12 +113,35 @@ export class LadderClient {
     this.send(`|/trn ${this.username},0,${parsed.assertion}`);
   }
 
-  private handleRequest(room: string, json: string) {
+  private async handleRequest(room: string, json: string) {
     let req: BattleRequest;
     try { req = JSON.parse(json) as BattleRequest; } catch { return; }
     if (req.wait) return;
-    const choice = this.select(req);
-    if (choice) this.send(`${room}|/choose ${choice}|${req.rqid ?? ''}`);
+
+    // Throttle: wait at least DECISION_THROTTLE_MS between decisions
+    const now = Date.now();
+    const elapsed = now - this.lastChoiceTime;
+    if (elapsed < DECISION_THROTTLE_MS) {
+      await new Promise(r => setTimeout(r, DECISION_THROTTLE_MS - elapsed));
+    }
+
+    const tracker = this.trackers.get(room);
+    let choice: Choice | null;
+    if (tracker) {
+      try {
+        choice = await selectAction(req, tracker);
+      } catch {
+        choice = chooseDefault(req);
+      }
+    } else {
+      choice = this.select(req);
+    }
+    choice = choice || chooseDefault(req);
+
+    if (choice) {
+      this.lastChoiceTime = Date.now();
+      this.send(`${room}|/choose ${choice}|${req.rqid ?? ''}`);
+    }
   }
 
   private async onBattleEnd(room: string, kind: string, winner?: string) {
@@ -128,6 +169,14 @@ if (process.argv[1] && process.argv[1].endsWith('client.ts')) {
   const user = process.env.PS_USERNAME, pass = process.env.PS_PASSWORD;
   if (!user || !pass) { console.error('Set PS_USERNAME and PS_PASSWORD (registered account).'); process.exit(1); }
   const n = parseInt(process.argv[2] || '20', 10);
+
+  // Load sets database and ONNX model before starting
+  const __dirname = dirname(fileURLToPath(import.meta.url));
+  const setsData = JSON.parse(readFileSync(resolve(__dirname, '../data/gen9randombattle.json'), 'utf-8'));
+  setSetsDb(setsData);
+  await loadNet(resolve(__dirname, '../models/imitation-dual-v2.onnx'));
+  console.log('[ladder] net loaded');
+
   new LadderClient(user, pass, n).start().then((s) => {
     console.log('[ladder] done:', s);
     process.exit(0);

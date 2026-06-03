@@ -25,6 +25,11 @@ export interface RequestSidePokemon {
   details: string;
   condition: string; // "CUR/MAX", "CUR/MAX brn", or "0 fnt"
   active: boolean;
+  stats?: Record<string, number>;
+  moves?: string[];
+  item?: string;
+  ability?: string;
+  baseAbility?: string;
 }
 
 export interface BattleRequest {
