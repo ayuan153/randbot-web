@@ -2,7 +2,7 @@
 
 Chronological record of SageMaker self-play validation runs, their configs, results, and what each
 taught us. For architecture see [`self-play-rl-design.md`](./self-play-rl-design.md); for the current
-next task see [`handoff-netfeedback-throughput.md`](./handoff-netfeedback-throughput.md).
+next task see [`HANDOFF.md`](./HANDOFF.md).
 
 All runs: `ml.g4dn.xlarge` (4 vCPU, 1 T4), AWS profile `randbot` (acct `516246239933`, us-east-1),
 image `…/randbats-training:latest`, config via `--environment`, `MaxRuntimeInSeconds=7200`.

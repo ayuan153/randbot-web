@@ -6,7 +6,7 @@ Technical plan for evolving randbats-bot from a heuristic engine (~1000 Elo) to 
 > near-term plan, see [`implementation-plan.md`](./implementation-plan.md). The Stage 4/5 work
 > (ISMCTS + self-play RL) is already partially built and validated on AWS — see
 > [`self-play-rl-design.md`](./self-play-rl-design.md) and the Tier 0 handoff
-> [`handoff-tier0-closeloop.md`](./handoff-tier0-closeloop.md).
+> [`HANDOFF.md`](./HANDOFF.md).
 
 ---
 

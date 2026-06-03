@@ -3,7 +3,7 @@
 AlphaZero-style self-play for Gen 9 Random Battles. This doc describes the architecture as built,
 its current limitations, and the design for scaling it. For the live status and phased roadmap see
 [`implementation-plan.md`](./implementation-plan.md); for the immediate next task see
-[`handoff-tier0-closeloop.md`](./handoff-tier0-closeloop.md).
+[`HANDOFF.md`](./HANDOFF.md).
 
 > **State (2026-05-31):** the loop is closed and measured. Heuristic value + Elo eval (Tier 0),
 > net fed back into MCTS (Tier 0.5), and process-per-core self-play parallelism (Tier 1) are all
@@ -12,7 +12,7 @@ its current limitations, and the design for scaling it. For the live status and 
 > than a single g4dn affords, and (b) onnxruntime-node inference in the MCTS hot loop is slow on the
 > g4dn CPU, so net-backed self-play games exceed the 30s per-game timeout and get dropped → net
 > iterations are data-starved. See `self-play-experiments.md` for the run log and
-> `handoff-netfeedback-throughput.md` for the next task. Per-tier detail is in "Current Limitations".
+> `HANDOFF.md` for the next task. Per-tier detail is in "Current Limitations".
 
 ---
 

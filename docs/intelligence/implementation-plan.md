@@ -11,7 +11,7 @@ A phased roadmap to evolve randbats-bot from a heuristic depth-2 searcher (~1000
 > see `self-play-experiments.md`). The **primary track is now supervised human-imitation + real
 > measurement**. Authoritative docs:
 > - `docs/intelligence/north-star-imitation-design.md` — Tracks 0/1/2 design + results (READ FIRST)
-> - `docs/intelligence/handoff-track2c.md` — the next task (2C) + ready-to-run handoff
+> - `docs/intelligence/HANDOFF.md` — the next task (2C) + ready-to-run handoff
 > Self-play RL is now a Phase-3 refinement on top of a human prior, not the foundation.
 
 ### Latest (2026-06-02) — Reframe; human-imitation net trained + wired into search
@@ -26,7 +26,7 @@ A phased roadmap to evolve randbats-bot from a heuristic depth-2 searcher (~1000
   265-dim input, `DualNet2`).
 - **Track 0 (built):** `ladder/` Showdown rated-ladder client (unit-tested core); needs an account to
   run live for the first real GXE.
-- **Next = Track 2C** (handoff-track2c.md): emit per-move features in `src/eval/features.ts`, swap the
+- **Next = Track 2C** (HANDOFF.md): emit per-move features in `src/eval/features.ts`, swap the
   shipped model to `imitation-dual-v2`, use the policy as a search prior, and measure on the ladder.
   **Blocker found:** `scripts/post-build.mjs` doesn't copy `.onnx.data` weight sidecars → the learned
   net never loads in the built extension (ml mode silently falls back to heuristic). 1-line fix, do
@@ -56,7 +56,7 @@ A phased roadmap to evolve randbats-bot from a heuristic depth-2 searcher (~1000
   the browser's 245-feature `learned-eval.ts`; v1 model is untouched.
 - **Next work is the self-play track, not the browser.** See the new roadmap and docs:
   - `docs/intelligence/self-play-rl-design.md` — architecture, current limitations, scaling design
-  - `docs/intelligence/handoff-tier0-closeloop.md` — Tier 0 task + ready-to-run handoff for a fresh agent
+  - `docs/intelligence/HANDOFF.md` — Tier 0 task + ready-to-run handoff for a fresh agent
 - **Immediate next step (Tier 0):** the MCTS loop is not yet "closed" (uniform policy + neutral
   value → near-random play) and there is no strength signal. Add a heuristic value + wire Elo eval,
   then confirm Elo climbs across iterations — before scaling games/features/compute.
@@ -128,7 +128,7 @@ A phased roadmap to evolve randbats-bot from a heuristic depth-2 searcher (~1000
   loop**, not raw game count. Parallelism works, but it can't help if each net game times out. Next
   agent must fix inference throughput (batch/cache evals, raise/scale the per-game timeout for net
   games, or cut sims/determinizations for net self-play) BEFORE another volume test. See
-  `self-play-experiments.md` (run log) and `handoff-netfeedback-throughput.md` (next task).
+  `self-play-experiments.md` (run log) and `HANDOFF.md` (next task).
 
 ### Key Decision
 
@@ -377,7 +377,7 @@ throughput, then features.
 ### Tier 0 — Make self-play meaningful + measurable (DO FIRST)
 
 The immediate next task. Full instructions + acceptance criteria in
-`docs/intelligence/handoff-tier0-closeloop.md`.
+`docs/intelligence/HANDOFF.md`.
 
 1. **Give MCTS a real value signal.** Replace `neutralValue` (passed at `self-play/sim/battle-runner.ts`
    lines ~126 & ~137) with a heuristic `ValueFn` over the `@pkmn/sim` Battle (HP-fraction differential
