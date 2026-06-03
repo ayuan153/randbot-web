@@ -19,6 +19,7 @@ import { loadNet } from './net-node';
 import { BattleStateTracker } from './battle-state';
 import { selectAction } from './bot-selector';
 import { setSetsDb } from '../src/state/sets-db';
+import { toID } from '../src/util/id';
 import { readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -43,6 +44,10 @@ export class LadderClient {
   private done = false;
   private trackers: Map<string, BattleStateTracker> = new Map();
   private lastChoiceTime = 0;
+  private reconnectCount = 0;
+  private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
+  private lastPong = 0;
+  private searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
   constructor(username: string, password: string, targetGames = 20, select: Selector = chooseDefault) {
     this.username = username;
@@ -53,11 +58,68 @@ export class LadderClient {
 
   start(): Promise<Stats> {
     return new Promise((resolve) => {
-      this.ws = new WebSocket(WS_URL);
-      this.ws.on('message', (data) => this.onMessage(data.toString(), resolve));
-      this.ws.on('error', (e) => console.error('[ws] error', e));
-      this.ws.on('close', () => { if (!this.done) resolve(this.stats); });
+      this.connect(resolve);
     });
+  }
+
+  private connect(resolve: (s: Stats) => void) {
+    this.ws = new WebSocket(WS_URL);
+    this.ws.on('open', () => {
+      console.log('[ladder] connected');
+      this.lastPong = Date.now();
+      this.startHeartbeat();
+    });
+    this.ws.on('message', (data) => {
+      this.reconnectCount = 0; // successful message resets cap
+      this.lastPong = Date.now(); // any message counts as activity
+      this.onMessage(data.toString(), resolve);
+    });
+    this.ws.on('pong', () => { this.lastPong = Date.now(); });
+    this.ws.on('error', (e) => console.error('[ws] error', e));
+    this.ws.on('close', () => {
+      this.stopHeartbeat();
+      this.clearSearchTimeout();
+      if (this.done) return;
+      if (this.reconnectCount >= 10) {
+        console.log('[ladder] reconnect cap reached, giving up');
+        resolve(this.stats);
+        return;
+      }
+      this.reconnectCount++;
+      console.log(`[ladder] connection lost, reconnecting (${this.reconnectCount})`);
+      setTimeout(() => this.connect(resolve), 2000);
+    });
+  }
+
+  private startHeartbeat() {
+    this.heartbeatInterval = setInterval(() => {
+      if (this.done || this.ws.readyState !== WebSocket.OPEN) return;
+      if (Date.now() - this.lastPong > 70_000) {
+        console.log('[ladder] dead socket detected, terminating');
+        this.ws.terminate(); // forces 'close' -> reconnect
+        return;
+      }
+      this.ws.ping();
+    }, 30_000);
+  }
+
+  private stopHeartbeat() {
+    if (this.heartbeatInterval) { clearInterval(this.heartbeatInterval); this.heartbeatInterval = null; }
+  }
+
+  private clearSearchTimeout() {
+    if (this.searchTimeout) { clearTimeout(this.searchTimeout); this.searchTimeout = null; }
+  }
+
+  private startSearchTimer() {
+    this.clearSearchTimeout();
+    this.searchTimeout = setTimeout(() => {
+      if (!this.done && !this.currentRoom && this.ws.readyState === WebSocket.OPEN) {
+        console.log('[ladder] search timeout, re-searching');
+        this.send(`|/search ${FORMAT}`);
+        this.startSearchTimer(); // restart for next attempt
+      }
+    }, 90_000);
   }
 
   private send(msg: string) { this.ws.send(msg); }
@@ -79,10 +141,14 @@ export class LadderClient {
       if (cmd === 'challstr') {
         await this.login(parts.slice(2).join('|'));
       } else if (cmd === 'updateuser' && parts[3] === '1') {
+        console.log(`[ladder] searching ${FORMAT}`);
         this.send(`|/search ${FORMAT}`);
+        this.startSearchTimer();
       } else if (cmd === 'init' && parts[2] === 'battle') {
         this.currentRoom = room;
+        this.clearSearchTimeout();
         this.trackers.set(room, new BattleStateTracker(this.username));
+        console.log(`[ladder] battle ${room} started`);
       } else if (cmd === 'request' && parts[2]) {
         await this.handleRequest(room || this.currentRoom || '', parts.slice(2).join('|'));
       } else if (cmd === 'error' && room) {
@@ -92,10 +158,16 @@ export class LadderClient {
         this.trackers.delete(room);
         if (this.stats.wins + this.stats.losses + this.stats.ties >= this.targetGames) {
           this.done = true;
+          this.stopHeartbeat();
+          this.clearSearchTimeout();
           this.ws.close();
           resolve(this.stats);
         } else {
-          setTimeout(() => this.send(`|/search ${FORMAT}`), 2500); // respect search cooldown
+          setTimeout(() => {
+            console.log(`[ladder] searching ${FORMAT}`);
+            this.send(`|/search ${FORMAT}`);
+            this.startSearchTimer();
+          }, 2500); // respect search cooldown
         }
       }
     }
@@ -111,6 +183,7 @@ export class LadderClient {
     const parsed = parseLoginResponse(await resp.text());
     if (!parsed) { console.error('[login] failed (check PS_USERNAME/PS_PASSWORD)'); this.ws.close(); return; }
     this.send(`|/trn ${this.username},0,${parsed.assertion}`);
+    console.log(`[ladder] logged in as ${this.username}`);
   }
 
   private async handleRequest(room: string, json: string) {
@@ -146,7 +219,7 @@ export class LadderClient {
 
   private async onBattleEnd(room: string, kind: string, winner?: string) {
     if (kind === 'tie') this.stats.ties++;
-    else if (winner && winner.toLowerCase() === this.username.toLowerCase()) this.stats.wins++;
+    else if (winner && toID(winner) === toID(this.username)) this.stats.wins++;
     else this.stats.losses++;
     if (room) this.send(`|/leave ${room}`);
     this.currentRoom = null;
