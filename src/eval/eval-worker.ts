@@ -10,14 +10,17 @@
 import type { EvalRequest, EvalResult, ScoredOption, BattleSnapshot } from '../types';
 import { search } from './minimax';
 import { evaluate } from './scoring';
-import { loadModel, isModelLoaded, evaluateWithModel } from './learned-eval';
+import { loadModel, isModelLoaded, evaluateWithModel, evaluateWithPolicy } from './learned-eval';
+import { blendPolicyPrior, buildMoveSortOrder } from './policy-prior';
 
 // Attempt to load the ONNX model on worker init (graceful if missing)
-const MODEL_PATH = 'models/value-net-v1.onnx';
+const MODEL_PATH = 'models/imitation-dual-v2.onnx';
 // ML leaf eval blends the net (rescaled win-prob) with the heuristic. The net is
 // trained on real game states; minimax leaves are approximate (avg-damage) sims,
 // so blending guards against the net being out-of-distribution on them.
 const ML_BLEND = 0.5;
+// Policy prior blend weight: β=0.7 means 70% search, 30% policy head.
+const POLICY_BLEND = 0.7;
 
 async function initModel(): Promise<void> {
   try {
@@ -50,10 +53,15 @@ self.onmessage = async (event: MessageEvent<EvalRequest>) => {
       return ML_BLEND * (winProb * 2 - 1) + (1 - ML_BLEND) * evaluate(s);
     };
     options = await search(request.snapshot, request.opponentModel, request.config, leafEval);
-    // Also surface the root win-prob on the top option for the dev overlay.
+    // Single root inference: get both win-prob and policy logits
+    const { winProb, policy } = await evaluateWithPolicy(request.snapshot);
+    // Surface root win-prob on the top option for the dev overlay.
     if (options.length > 0) {
-      options[0].breakdown.positionalScore = await evaluateWithModel(request.snapshot);
+      options[0].breakdown.positionalScore = winProb;
     }
+    // Blend policy prior into the ranking
+    const moveSortOrder = buildMoveSortOrder(request.snapshot.player.active.moves);
+    options = blendPolicyPrior(options, policy, moveSortOrder, POLICY_BLEND);
   } else {
     options = await search(request.snapshot, request.opponentModel, request.config);
   }

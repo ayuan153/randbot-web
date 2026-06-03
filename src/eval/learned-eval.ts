@@ -25,3 +25,14 @@ export async function evaluateWithModel(snapshot: BattleSnapshot): Promise<numbe
   const output = results['win_probability'];
   return (output.data as Float32Array)[0];
 }
+
+/** Run the dual-head model once and return both win probability and policy logits. */
+export async function evaluateWithPolicy(snapshot: BattleSnapshot): Promise<{ winProb: number; policy: Float32Array }> {
+  if (!session) throw new Error('Model not loaded');
+  const features = extractFeatures(snapshot);
+  const tensor = new ort.Tensor('float32', features, [1, features.length]);
+  const results = await session.run({ state: tensor });
+  const winProb = (results['win_probability'].data as Float32Array)[0];
+  const policy = results['policy_logits'].data as Float32Array;
+  return { winProb, policy };
+}
