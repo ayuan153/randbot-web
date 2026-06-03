@@ -47,7 +47,7 @@ const distModelsDir = resolve(distDir, 'models');
 if (existsSync(modelsDir)) {
   if (!existsSync(distModelsDir)) mkdirSync(distModelsDir, { recursive: true });
   for (const file of readdirSync(modelsDir)) {
-    if (file.endsWith('.onnx')) {
+    if (file.endsWith('.onnx') || file.endsWith('.onnx.data')) {
       copyFileSync(resolve(modelsDir, file), resolve(distModelsDir, file));
     }
   }
