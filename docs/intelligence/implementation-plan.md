@@ -14,6 +14,22 @@ A phased roadmap to evolve randbats-bot from a heuristic depth-2 searcher (~1000
 > - `docs/intelligence/HANDOFF.md` — the next task (2C) + ready-to-run handoff
 > Self-play RL is now a Phase-3 refinement on top of a human prior, not the foundation.
 
+### Latest (2026-06-03) — Track 2C COMPLETE + first real ladder GXE
+
+- **Data-gap fix (critical):** the Python feature tables were ~70% incomplete (missing common
+  species/moves → wrong defaults), so both nets had trained on largely-wrong type/move features.
+  Regenerated complete gen9 tables from `@pkmn` (`scripts/gen-data-tables.mjs` →
+  `training/features/data/*.json`); TS↔Python parity now exact.
+- **Retrained `imitation-dual-v2`** on corrected 5.0M-decision data: held-out **win-acc 0.671,
+  move top-1 0.40** (was 0.35). Shipped (build now copies `.onnx.data`).
+- **Track 2C done:** 265 features in `src/eval/features.ts`, policy head read, root **policy prior**
+  blended into ranking (`src/eval/policy-prior.ts`).
+- **North-star measured:** automated ladder harness (`ladder/`) drove the bot on `gen9randombattle` →
+  **GXE 30.4, Elo ~1062, 11W-24L** (well below average; slight under-estimate from a since-fixed
+  watchdog bug). Clean re-run needs a **residential IP** (PS locks datacenter IPs as proxies).
+- **Next:** clean ladder re-measure from a residential IP, then **stronger net and/or deeper search**
+  (the GXE shows the current approach is weak). See `HANDOFF.md`.
+
 ### Latest (2026-06-02) — Reframe; human-imitation net trained + wired into search
 
 - **Reframe:** stopped self-play-from-heuristic; pivoted to imitation from 31.7M human replays + a
@@ -37,7 +53,7 @@ A phased roadmap to evolve randbats-bot from a heuristic depth-2 searcher (~1000
 | Search | Depth-2 expectiminimax; learned value net wired as a blended async leaf eval (Track 2A) |
 | Damage | `@smogon/calc` (JS, 16-roll average per calc) |
 | Opponent model | Bayesian set narrowing — eliminates impossible sets as moves/items/abilities are revealed |
-| Evaluation | Imitation dual-head net (value+policy); `imitation-dual-v2.onnx` 265-d (not yet shipped — see 2C) |
+| Evaluation | Imitation dual-head net (value+policy); `imitation-dual-v2.onnx` 265-d — **shipped**; value head = blended leaf eval, policy head = root search prior |
 | Extension | Chrome extension with dev mode, turn logging, Shadow DOM overlay |
 | Performance | ~50-200 positions/second |
 | **Estimated strength** | **~1000-1100 Elo (offline proxy only; no live ladder GXE yet)** |
