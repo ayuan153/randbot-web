@@ -6,15 +6,41 @@ A phased roadmap to evolve randbats-bot from a heuristic depth-2 searcher (~1000
 
 ## Current State
 
+> **⚠️ 2026-06-02 — Direction changed.** The self-play-from-heuristic track below is **deprioritized**
+> (a low-noise gate proved more bootstrap data doesn't help — it's behavioral cloning of the heuristic;
+> see `self-play-experiments.md`). The **primary track is now supervised human-imitation + real
+> measurement**. Authoritative docs:
+> - `docs/intelligence/north-star-imitation-design.md` — Tracks 0/1/2 design + results (READ FIRST)
+> - `docs/intelligence/handoff-track2c.md` — the next task (2C) + ready-to-run handoff
+> Self-play RL is now a Phase-3 refinement on top of a human prior, not the foundation.
+
+### Latest (2026-06-02) — Reframe; human-imitation net trained + wired into search
+
+- **Reframe:** stopped self-play-from-heuristic; pivoted to imitation from 31.7M human replays + a
+  real ladder measurement. Rationale + evidence in `north-star-imitation-design.md`.
+- **Track 1 (done):** dual-head value+policy net trained on 5.0M decisions from 100K games ≥1500.
+  Held-out **win-pred 0.67**, **move top-1 0.30** (`models/imitation-dual-v1.onnx`).
+- **Track 2A (done):** the learned value net now **drives** depth-2 search as a blended async leaf
+  evaluator (was a metadata overlay). `src/eval/minimax.ts` + `eval-worker.ts`.
+- **Track 2B (done):** per-move policy features → **move top-1 0.30→0.35** (`imitation-dual-v2.onnx`,
+  265-dim input, `DualNet2`).
+- **Track 0 (built):** `ladder/` Showdown rated-ladder client (unit-tested core); needs an account to
+  run live for the first real GXE.
+- **Next = Track 2C** (handoff-track2c.md): emit per-move features in `src/eval/features.ts`, swap the
+  shipped model to `imitation-dual-v2`, use the policy as a search prior, and measure on the ladder.
+  **Blocker found:** `scripts/post-build.mjs` doesn't copy `.onnx.data` weight sidecars → the learned
+  net never loads in the built extension (ml mode silently falls back to heuristic). 1-line fix, do
+  this first.
+
 | Component | Status |
 |-----------|--------|
-| Search | Depth-2 expectiminimax with alpha-beta pruning |
+| Search | Depth-2 expectiminimax; learned value net wired as a blended async leaf eval (Track 2A) |
 | Damage | `@smogon/calc` (JS, 16-roll average per calc) |
 | Opponent model | Bayesian set narrowing — eliminates impossible sets as moves/items/abilities are revealed |
-| Evaluation | ONNX neural net (MLP 206→256→128→64→1) + heuristic fallback |
+| Evaluation | Imitation dual-head net (value+policy); `imitation-dual-v2.onnx` 265-d (not yet shipped — see 2C) |
 | Extension | Chrome extension with dev mode, turn logging, Shadow DOM overlay |
 | Performance | ~50-200 positions/second |
-| **Estimated strength** | **~1000-1100 Elo** |
+| **Estimated strength** | **~1000-1100 Elo (offline proxy only; no live ladder GXE yet)** |
 
 ### Latest (2026-05-06)
 
