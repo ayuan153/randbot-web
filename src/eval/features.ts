@@ -1,6 +1,7 @@
 /**
  * Feature extraction for ONNX model inference.
- * Produces a 206-element Float32Array matching training/features/extract_features.py.
+ * Produces a 265-element Float32Array (245 state + 4×5 per-move) matching
+ * training/features/extract_features.py.
  *
  * Layout:
  *   [0..155]   Per-Pokemon x12, 13 features each (player slots 0-5, opponent slots 6-11)
@@ -8,6 +9,8 @@
  *   [164..175] Team-level features (12)
  *   [176..193] Field features (18)
  *   [194..205] Tempo features (12)
+ *   [206..244] Extended features (speed, type matchup, TTKO, team comp, momentum, setup, stall, futility)
+ *   [245..264] Per-move features (4 moves × 5 features)
  */
 
 import type { BattleSnapshot, PokemonState, SideState } from '../types';
@@ -15,7 +18,7 @@ import { Generations, TypeName } from '@pkmn/data';
 import { Dex } from '@pkmn/dex';
 import { toID } from '../util/id';
 
-export const FEATURE_COUNT = 245;
+export const FEATURE_COUNT = 265;
 
 const gens = new Generations(Dex);
 const gen9 = gens.get(9);
@@ -137,6 +140,7 @@ export function extractFeatures(snapshot: BattleSnapshot): Float32Array {
   idx = writeStallFeatures(f, idx, snapshot);
   // H. Futility (3)
   idx = writeFutilityFeatures(f, idx, snapshot);
+  idx = writeMoveFeatures(f, idx, snapshot);
 
   return f;
 }
@@ -589,4 +593,51 @@ function writeFutilityFeatures(f: Float32Array, idx: number, snapshot: BattleSna
   f[idx++] = theyWalled;
   f[idx++] = futility;
   return idx;
+}
+
+/**
+ * Compute the 20-float per-move block (4 moves × 5 features) for the active mon
+ * vs the opponent active. Must stay in sync with Python `_move_features` in
+ * training/features/extract_features.py.
+ */
+export function computeMoveBlock(activeSpecies: string, moveNames: string[], oppSpecies: string): number[] {
+  const byId = new Map<string, string>();
+  for (const name of moveNames) {
+    byId.set(toID(name), name);
+  }
+  if (byId.size !== 4) return new Array(20).fill(0);
+
+  const myTypes = getTypes(activeSpecies);
+  const oppTypes = getTypes(oppSpecies);
+  const sortedKeys = [...byId.keys()].sort();
+
+  const feats: number[] = [];
+  for (const mid of sortedKeys) {
+    const name = byId.get(mid)!;
+    const [mtype, bp] = getMoveTypePower(name);
+    const eff = typeEffectiveness(mtype, oppTypes);
+    feats.push(
+      Math.min(eff / 4.0, 1.0),
+      Math.min(bp / 150.0, 1.0),
+      bp === 0 ? 1 : 0,
+      PRIORITY_MOVES.has(name) ? 1 : 0,
+      myTypes.includes(mtype) ? 1 : 0,
+    );
+  }
+  return feats;
+}
+
+/** Write per-move features; must stay in sync with Python `_move_features`. */
+function writeMoveFeatures(f: Float32Array, idx: number, snapshot: BattleSnapshot): number {
+  if (!snapshot.player.active || !snapshot.opponent.active) {
+    for (let i = 0; i < 20; i++) f[idx + i] = 0;
+    return idx + 20;
+  }
+  const block = computeMoveBlock(
+    snapshot.player.active.species,
+    snapshot.player.active.moves,
+    snapshot.opponent.active.species,
+  );
+  for (let i = 0; i < 20; i++) f[idx + i] = block[i];
+  return idx + 20;
 }
