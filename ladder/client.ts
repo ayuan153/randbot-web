@@ -46,7 +46,7 @@ export class LadderClient {
   private lastChoiceTime = 0;
   private reconnectCount = 0;
   private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
-  private lastPong = 0;
+  private lastMessageTime = 0;
   private searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
   constructor(username: string, password: string, targetGames = 20, select: Selector = chooseDefault) {
@@ -66,35 +66,34 @@ export class LadderClient {
     this.ws = new WebSocket(WS_URL);
     this.ws.on('open', () => {
       console.log('[ladder] connected');
-      this.lastPong = Date.now();
+      this.lastMessageTime = Date.now();
       this.startHeartbeat();
     });
     this.ws.on('message', (data) => {
-      this.reconnectCount = 0; // successful message resets cap
-      this.lastPong = Date.now(); // any message counts as activity
+      this.lastMessageTime = Date.now(); // any message counts as activity
       this.onMessage(data.toString(), resolve);
     });
-    this.ws.on('pong', () => { this.lastPong = Date.now(); });
     this.ws.on('error', (e) => console.error('[ws] error', e));
     this.ws.on('close', () => {
       this.stopHeartbeat();
       this.clearSearchTimeout();
       if (this.done) return;
-      if (this.reconnectCount >= 10) {
+      if (this.reconnectCount >= 15) {
         console.log('[ladder] reconnect cap reached, giving up');
         resolve(this.stats);
         return;
       }
       this.reconnectCount++;
-      console.log(`[ladder] connection lost, reconnecting (${this.reconnectCount})`);
-      setTimeout(() => this.connect(resolve), 2000);
+      const delay = Math.min(30_000, 2000 * 2 ** (this.reconnectCount - 1));
+      console.log(`[ladder] connection lost, reconnecting in ${delay}ms (${this.reconnectCount})`);
+      setTimeout(() => this.connect(resolve), delay);
     });
   }
 
   private startHeartbeat() {
     this.heartbeatInterval = setInterval(() => {
       if (this.done || this.ws.readyState !== WebSocket.OPEN) return;
-      if (Date.now() - this.lastPong > 70_000) {
+      if (Date.now() - this.lastMessageTime > 240_000) {
         console.log('[ladder] dead socket detected, terminating');
         this.ws.terminate(); // forces 'close' -> reconnect
         return;
@@ -147,6 +146,7 @@ export class LadderClient {
       } else if (cmd === 'init' && parts[2] === 'battle') {
         this.currentRoom = room;
         this.clearSearchTimeout();
+        this.reconnectCount = 0; // battle started: reset backoff
         this.trackers.set(room, new BattleStateTracker(this.username));
         console.log(`[ladder] battle ${room} started`);
       } else if (cmd === 'request' && parts[2]) {
@@ -154,6 +154,7 @@ export class LadderClient {
       } else if (cmd === 'error' && room) {
         console.warn('[battle] choice error:', parts.slice(2).join('|'));
       } else if (cmd === 'win' || cmd === 'tie') {
+        this.reconnectCount = 0; // game ended: reset backoff
         await this.onBattleEnd(room, cmd, parts[2]);
         this.trackers.delete(room);
         if (this.stats.wins + this.stats.losses + this.stats.ties >= this.targetGames) {
