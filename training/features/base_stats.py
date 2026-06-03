@@ -153,217 +153,29 @@ BASE_STATS: dict[str, tuple[int, int, int, int, int, int]] = {
     "Zoroark-Hisui": (55, 100, 60, 125, 60, 110),
 }
 
-# {species: [type1, type2]} - types for common randbats Pokemon
-SPECIES_TYPES: dict[str, list[str]] = {
-    "Abomasnow": ["Grass", "Ice"],
-    "Absol": ["Dark"],
-    "Aegislash": ["Steel", "Ghost"],
-    "Alcremie": ["Fairy"],
-    "Alomomola": ["Water"],
-    "Ambipom": ["Normal"],
-    "Ampharos": ["Electric"],
-    "Annihilape": ["Fighting", "Ghost"],
-    "Araquanid": ["Water", "Bug"],
-    "Arboliva": ["Grass", "Normal"],
-    "Arcanine": ["Fire"],
-    "Archaludon": ["Steel", "Dragon"],
-    "Armarouge": ["Fire", "Psychic"],
-    "Azumarill": ["Water", "Fairy"],
-    "Baxcalibur": ["Dragon", "Ice"],
-    "Bisharp": ["Dark", "Steel"],
-    "Blastoise": ["Water"],
-    "Blaziken": ["Fire", "Fighting"],
-    "Blissey": ["Normal"],
-    "Brambleghast": ["Grass", "Ghost"],
-    "Breloom": ["Grass", "Fighting"],
-    "Brute Bonnet": ["Grass", "Dark"],
-    "Ceruledge": ["Fire", "Ghost"],
-    "Chandelure": ["Ghost", "Fire"],
-    "Chansey": ["Normal"],
-    "Cinderace": ["Fire"],
-    "Clefable": ["Fairy"],
-    "Cloyster": ["Water", "Ice"],
-    "Cobalion": ["Steel", "Fighting"],
-    "Conkeldurr": ["Fighting"],
-    "Corviknight": ["Flying", "Steel"],
-    "Cyclizar": ["Dragon", "Normal"],
-    "Darkrai": ["Dark"],
-    "Decidueye": ["Grass", "Ghost"],
-    "Ditto": ["Normal"],
-    "Donphan": ["Ground"],
-    "Dragapult": ["Dragon", "Ghost"],
-    "Dragonite": ["Dragon", "Flying"],
-    "Drapion": ["Poison", "Dark"],
-    "Enamorus": ["Fairy", "Flying"],
-    "Espeon": ["Psychic"],
-    "Excadrill": ["Ground", "Steel"],
-    "Ferrothorn": ["Grass", "Steel"],
-    "Flamigo": ["Flying", "Fighting"],
-    "Floatzel": ["Water"],
-    "Flygon": ["Ground", "Dragon"],
-    "Forretress": ["Bug", "Steel"],
-    "Gallade": ["Psychic", "Fighting"],
-    "Garchomp": ["Dragon", "Ground"],
-    "Gardevoir": ["Psychic", "Fairy"],
-    "Gastrodon": ["Water", "Ground"],
-    "Gengar": ["Ghost", "Poison"],
-    "Glimmora": ["Rock", "Poison"],
-    "Gliscor": ["Ground", "Flying"],
-    "Goodra": ["Dragon"],
-    "Grafaiai": ["Poison", "Normal"],
-    "Great Tusk": ["Ground", "Fighting"],
-    "Greninja": ["Water", "Dark"],
-    "Grimmsnarl": ["Dark", "Fairy"],
-    "Gyarados": ["Water", "Flying"],
-    "Hatterene": ["Psychic", "Fairy"],
-    "Hawlucha": ["Fighting", "Flying"],
-    "Heatran": ["Fire", "Steel"],
-    "Heracross": ["Bug", "Fighting"],
-    "Hippowdon": ["Ground"],
-    "Hydreigon": ["Dark", "Dragon"],
-    "Infernape": ["Fire", "Fighting"],
-    "Iron Bundle": ["Ice", "Water"],
-    "Iron Hands": ["Fighting", "Electric"],
-    "Iron Jugulis": ["Dark", "Flying"],
-    "Iron Moth": ["Fire", "Poison"],
-    "Iron Thorns": ["Rock", "Electric"],
-    "Iron Valiant": ["Fairy", "Fighting"],
-    "Jirachi": ["Steel", "Psychic"],
-    "Kartana": ["Grass", "Steel"],
-    "Kilowattrel": ["Electric", "Flying"],
-    "Kingambit": ["Dark", "Steel"],
-    "Kleavor": ["Bug", "Rock"],
-    "Kommo-o": ["Dragon", "Fighting"],
-    "Krookodile": ["Ground", "Dark"],
-    "Landorus": ["Ground", "Flying"],
-    "Landorus-Therian": ["Ground", "Flying"],
-    "Lilligant-Hisui": ["Grass", "Fighting"],
-    "Lokix": ["Bug", "Dark"],
-    "Lucario": ["Fighting", "Steel"],
-    "Lycanroc": ["Rock"],
-    "Mamoswine": ["Ice", "Ground"],
-    "Manaphy": ["Water"],
-    "Maushold": ["Normal"],
-    "Meowscarada": ["Grass", "Dark"],
-    "Metagross": ["Steel", "Psychic"],
-    "Mienshao": ["Fighting"],
-    "Milotic": ["Water"],
-    "Mimikyu": ["Ghost", "Fairy"],
-    "Moltres-Galar": ["Dark", "Flying"],
-    "Muk-Alola": ["Poison", "Dark"],
-    "Ninetales-Alola": ["Ice", "Fairy"],
-    "Noivern": ["Flying", "Dragon"],
-    "Ogerpon": ["Grass"],
-    "Orthworm": ["Steel"],
-    "Palafin": ["Water"],
-    "Pelipper": ["Water", "Flying"],
-    "Polteageist": ["Ghost"],
-    "Primarina": ["Water", "Fairy"],
-    "Quaquaval": ["Water", "Fighting"],
-    "Raging Bolt": ["Electric", "Dragon"],
-    "Rillaboom": ["Grass"],
-    "Roaring Moon": ["Dragon", "Dark"],
-    "Rotom-Heat": ["Electric", "Fire"],
-    "Rotom-Wash": ["Electric", "Water"],
-    "Samurott-Hisui": ["Water", "Dark"],
-    "Sandy Shocks": ["Electric", "Ground"],
-    "Scizor": ["Bug", "Steel"],
-    "Serperior": ["Grass"],
-    "Skeledirge": ["Fire", "Ghost"],
-    "Slowbro": ["Water", "Psychic"],
-    "Slowking": ["Water", "Psychic"],
-    "Slowking-Galar": ["Poison", "Psychic"],
-    "Sneasler": ["Fighting", "Poison"],
-    "Sylveon": ["Fairy"],
-    "Talonflame": ["Fire", "Flying"],
-    "Tatsugiri": ["Dragon", "Water"],
-    "Tauros-Paldea-Aqua": ["Fighting", "Water"],
-    "Tauros-Paldea-Blaze": ["Fighting", "Fire"],
-    "Tauros-Paldea-Combat": ["Fighting"],
-    "Tentacruel": ["Water", "Poison"],
-    "Thundurus": ["Electric", "Flying"],
-    "Thundurus-Therian": ["Electric", "Flying"],
-    "Tinkaton": ["Fairy", "Steel"],
-    "Tornadus": ["Flying"],
-    "Tornadus-Therian": ["Flying"],
-    "Toxapex": ["Poison", "Water"],
-    "Toxtricity": ["Electric", "Poison"],
-    "Tsareena": ["Grass"],
-    "Tyranitar": ["Rock", "Dark"],
-    "Umbreon": ["Dark"],
-    "Ursaluna": ["Ground", "Normal"],
-    "Ursaluna-Bloodmoon": ["Ground", "Normal"],
-    "Urshifu": ["Fighting", "Dark"],
-    "Urshifu-Rapid-Strike": ["Fighting", "Water"],
-    "Vaporeon": ["Water"],
-    "Venusaur": ["Grass", "Poison"],
-    "Volcanion": ["Fire", "Water"],
-    "Weavile": ["Dark", "Ice"],
-    "Wo-Chien": ["Dark", "Grass"],
-    "Zamazenta": ["Fighting"],
-    "Zarude": ["Dark", "Grass"],
-    "Zoroark-Hisui": ["Normal", "Ghost"],
-}
+# {id: [type1, type2]} - types loaded from @pkmn/data gen9 (generated by scripts/gen-data-tables.mjs)
+import json
+import os
+import re
 
-# Move type mapping for base power estimation
-MOVE_BASE_POWERS: dict[str, tuple[str, int]] = {
-    # (type, base_power) for common moves
-    "Earthquake": ("Ground", 100), "Close Combat": ("Fighting", 120),
-    "Flare Blitz": ("Fire", 120), "Ice Beam": ("Ice", 90),
-    "Thunderbolt": ("Electric", 90), "Hydro Pump": ("Water", 110),
-    "Surf": ("Water", 90), "Fire Blast": ("Fire", 110),
-    "Thunder": ("Electric", 110), "Blizzard": ("Ice", 110),
-    "Stone Edge": ("Rock", 100), "Knock Off": ("Dark", 65),
-    "U-turn": ("Bug", 70), "Volt Switch": ("Electric", 70),
-    "Brave Bird": ("Flying", 120), "Iron Head": ("Steel", 80),
-    "Play Rough": ("Fairy", 90), "Moonblast": ("Fairy", 95),
-    "Shadow Ball": ("Ghost", 80), "Psychic": ("Psychic", 90),
-    "Energy Ball": ("Grass", 90), "Leaf Storm": ("Grass", 130),
-    "Draco Meteor": ("Dragon", 130), "Dragon Claw": ("Dragon", 80),
-    "Sludge Bomb": ("Poison", 90), "Aura Sphere": ("Fighting", 80),
-    "Focus Blast": ("Fighting", 120), "Dark Pulse": ("Dark", 80),
-    "Scald": ("Water", 80), "Body Slam": ("Normal", 85),
-    "Return": ("Normal", 102), "Extreme Speed": ("Normal", 80),
-    "Bullet Punch": ("Steel", 40), "Mach Punch": ("Fighting", 40),
-    "Aqua Jet": ("Water", 40), "Ice Shard": ("Ice", 40),
-    "Shadow Sneak": ("Ghost", 40), "Sucker Punch": ("Dark", 70),
-    "Quick Attack": ("Normal", 40), "Accelerock": ("Rock", 40),
-    "Grassy Glide": ("Grass", 55), "Jet Punch": ("Water", 60),
-    "Swords Dance": ("Normal", 0), "Dragon Dance": ("Dragon", 0),
-    "Calm Mind": ("Psychic", 0), "Nasty Plot": ("Dark", 0),
-    "Quiver Dance": ("Bug", 0), "Shell Smash": ("Normal", 0),
-    "Iron Defense": ("Steel", 0), "Bulk Up": ("Fighting", 0),
-    "Shift Gear": ("Steel", 0), "Coil": ("Poison", 0),
-    "Recover": ("Normal", 0), "Roost": ("Flying", 0),
-    "Synthesis": ("Grass", 0), "Moonlight": ("Fairy", 0),
-    "Morning Sun": ("Normal", 0), "Soft-Boiled": ("Normal", 0),
-    "Slack Off": ("Normal", 0), "Shore Up": ("Ground", 0),
-    "Strength Sap": ("Grass", 0),
-    "Roar": ("Normal", 0), "Whirlwind": ("Normal", 0),
-    "Dragon Tail": ("Dragon", 60), "Circle Throw": ("Fighting", 60),
-    "Haze": ("Ice", 0), "Clear Smog": ("Poison", 50),
-    "Toxic": ("Poison", 0), "Toxic Spikes": ("Poison", 0),
-    "Substitute": ("Normal", 0),
-    "Protect": ("Normal", 0), "Detect": ("Fighting", 0),
-    "Baneful Bunker": ("Poison", 0), "King's Shield": ("Steel", 0),
-    "Spiky Shield": ("Grass", 0),
-    "Stealth Rock": ("Rock", 0), "Spikes": ("Ground", 0),
-    "Sticky Web": ("Bug", 0),
-    "Flamethrower": ("Fire", 90), "Outrage": ("Dragon", 120),
-    "Waterfall": ("Water", 80), "Wild Charge": ("Electric", 90),
-    "Gunk Shot": ("Poison", 120), "Poison Jab": ("Poison", 80),
-    "X-Scissor": ("Bug", 80), "Megahorn": ("Bug", 120),
-    "Zen Headbutt": ("Psychic", 80), "Psyshock": ("Psychic", 80),
-    "Power Gem": ("Rock", 80), "Rock Slide": ("Rock", 75),
-    "Seed Bomb": ("Grass", 80), "Wood Hammer": ("Grass", 120),
-    "Icicle Crash": ("Ice", 85), "Triple Axel": ("Ice", 60),
-    "Hammer Arm": ("Fighting", 100), "Drain Punch": ("Fighting", 75),
-    "Crunch": ("Dark", 80), "Throat Chop": ("Dark", 80),
-    "Spirit Shackle": ("Ghost", 80), "Poltergeist": ("Ghost", 110),
-    "Flash Cannon": ("Steel", 80), "Meteor Mash": ("Steel", 90),
-    "Dazzling Gleam": ("Fairy", 80), "Hurricane": ("Flying", 110),
-    "Air Slash": ("Flying", 75), "Acrobatics": ("Flying", 110),
-}
+_DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
+
+
+def _to_id(name: str) -> str:
+    """Normalize name to Showdown toID format (lowercase, only a-z0-9)."""
+    return re.sub(r"[^a-z0-9]", "", name.lower())
+
+
+with open(os.path.join(_DATA_DIR, "species_types.json")) as _f:
+    SPECIES_TYPES: dict[str, list[str]] = json.load(_f)
+
+with open(os.path.join(_DATA_DIR, "move_base_powers.json")) as _f:
+    _raw_moves = json.load(_f)
+    MOVE_BASE_POWERS: dict[str, tuple[str, int]] = {
+        k: (v[0], int(v[1])) for k, v in _raw_moves.items()
+    }
+
+# Move type and base power data loaded from @pkmn/data gen9 (see SPECIES_TYPES load above)
 
 
 def get_base_speed(species: str) -> int:
@@ -379,7 +191,7 @@ def get_base_stats(species: str) -> tuple[int, int, int, int, int, int]:
 
 def get_types(species: str) -> list[str]:
     """Return type list for species, default ['Normal']."""
-    return SPECIES_TYPES.get(species, ["Normal"])
+    return SPECIES_TYPES.get(_to_id(species), ["Normal"])
 
 
 def estimate_speed(species: str, level: int = 84) -> float:
@@ -392,4 +204,4 @@ def estimate_speed(species: str, level: int = 84) -> float:
 
 def get_move_type_power(move: str) -> tuple[str, int]:
     """Return (type, base_power) for a move, default ('Normal', 80)."""
-    return MOVE_BASE_POWERS.get(move, ("Normal", 80))
+    return MOVE_BASE_POWERS.get(_to_id(move), ("Normal", 80))

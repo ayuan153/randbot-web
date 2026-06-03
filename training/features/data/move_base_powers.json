@@ -1,0 +1,2742 @@
+{
+  "absorb": [
+    "Grass",
+    20
+  ],
+  "accelerock": [
+    "Rock",
+    40
+  ],
+  "acid": [
+    "Poison",
+    40
+  ],
+  "acidarmor": [
+    "Poison",
+    0
+  ],
+  "acidspray": [
+    "Poison",
+    40
+  ],
+  "acrobatics": [
+    "Flying",
+    55
+  ],
+  "acupressure": [
+    "Normal",
+    0
+  ],
+  "aerialace": [
+    "Flying",
+    60
+  ],
+  "aeroblast": [
+    "Flying",
+    100
+  ],
+  "afteryou": [
+    "Normal",
+    0
+  ],
+  "agility": [
+    "Psychic",
+    0
+  ],
+  "aircutter": [
+    "Flying",
+    60
+  ],
+  "airslash": [
+    "Flying",
+    75
+  ],
+  "alluringvoice": [
+    "Fairy",
+    80
+  ],
+  "allyswitch": [
+    "Psychic",
+    0
+  ],
+  "amnesia": [
+    "Psychic",
+    0
+  ],
+  "ancientpower": [
+    "Rock",
+    60
+  ],
+  "appleacid": [
+    "Grass",
+    80
+  ],
+  "aquacutter": [
+    "Water",
+    70
+  ],
+  "aquajet": [
+    "Water",
+    40
+  ],
+  "aquaring": [
+    "Water",
+    0
+  ],
+  "aquastep": [
+    "Water",
+    80
+  ],
+  "aquatail": [
+    "Water",
+    90
+  ],
+  "armorcannon": [
+    "Fire",
+    120
+  ],
+  "armthrust": [
+    "Fighting",
+    15
+  ],
+  "aromaticmist": [
+    "Fairy",
+    0
+  ],
+  "assurance": [
+    "Dark",
+    60
+  ],
+  "astonish": [
+    "Ghost",
+    30
+  ],
+  "astralbarrage": [
+    "Ghost",
+    120
+  ],
+  "attackorder": [
+    "Bug",
+    90
+  ],
+  "attract": [
+    "Normal",
+    0
+  ],
+  "aurasphere": [
+    "Fighting",
+    80
+  ],
+  "aurawheel": [
+    "Electric",
+    110
+  ],
+  "aurorabeam": [
+    "Ice",
+    65
+  ],
+  "auroraveil": [
+    "Ice",
+    0
+  ],
+  "avalanche": [
+    "Ice",
+    60
+  ],
+  "axekick": [
+    "Fighting",
+    120
+  ],
+  "babydolleyes": [
+    "Fairy",
+    0
+  ],
+  "banefulbunker": [
+    "Poison",
+    0
+  ],
+  "barbbarrage": [
+    "Poison",
+    60
+  ],
+  "batonpass": [
+    "Normal",
+    0
+  ],
+  "beakblast": [
+    "Flying",
+    100
+  ],
+  "beatup": [
+    "Dark",
+    0
+  ],
+  "behemothbash": [
+    "Steel",
+    100
+  ],
+  "behemothblade": [
+    "Steel",
+    100
+  ],
+  "belch": [
+    "Poison",
+    120
+  ],
+  "bellydrum": [
+    "Normal",
+    0
+  ],
+  "bind": [
+    "Normal",
+    15
+  ],
+  "bite": [
+    "Dark",
+    60
+  ],
+  "bitterblade": [
+    "Fire",
+    90
+  ],
+  "bittermalice": [
+    "Ghost",
+    75
+  ],
+  "blastburn": [
+    "Fire",
+    150
+  ],
+  "blazekick": [
+    "Fire",
+    85
+  ],
+  "bleakwindstorm": [
+    "Flying",
+    100
+  ],
+  "blizzard": [
+    "Ice",
+    110
+  ],
+  "block": [
+    "Normal",
+    0
+  ],
+  "bloodmoon": [
+    "Normal",
+    140
+  ],
+  "blueflare": [
+    "Fire",
+    130
+  ],
+  "bodypress": [
+    "Fighting",
+    80
+  ],
+  "bodyslam": [
+    "Normal",
+    85
+  ],
+  "boltstrike": [
+    "Electric",
+    130
+  ],
+  "bonerush": [
+    "Ground",
+    25
+  ],
+  "boomburst": [
+    "Normal",
+    140
+  ],
+  "bounce": [
+    "Flying",
+    85
+  ],
+  "branchpoke": [
+    "Grass",
+    40
+  ],
+  "bravebird": [
+    "Flying",
+    120
+  ],
+  "breakingswipe": [
+    "Dragon",
+    60
+  ],
+  "brickbreak": [
+    "Fighting",
+    75
+  ],
+  "brine": [
+    "Water",
+    65
+  ],
+  "brutalswing": [
+    "Dark",
+    60
+  ],
+  "bubblebeam": [
+    "Water",
+    65
+  ],
+  "bugbite": [
+    "Bug",
+    60
+  ],
+  "bugbuzz": [
+    "Bug",
+    90
+  ],
+  "bulkup": [
+    "Fighting",
+    0
+  ],
+  "bulldoze": [
+    "Ground",
+    60
+  ],
+  "bulletpunch": [
+    "Steel",
+    40
+  ],
+  "bulletseed": [
+    "Grass",
+    25
+  ],
+  "burningbulwark": [
+    "Fire",
+    0
+  ],
+  "burningjealousy": [
+    "Fire",
+    70
+  ],
+  "calmmind": [
+    "Psychic",
+    0
+  ],
+  "ceaselessedge": [
+    "Dark",
+    65
+  ],
+  "celebrate": [
+    "Normal",
+    0
+  ],
+  "charge": [
+    "Electric",
+    0
+  ],
+  "chargebeam": [
+    "Electric",
+    50
+  ],
+  "charm": [
+    "Fairy",
+    0
+  ],
+  "chillingwater": [
+    "Water",
+    50
+  ],
+  "chillyreception": [
+    "Ice",
+    0
+  ],
+  "chloroblast": [
+    "Grass",
+    150
+  ],
+  "circlethrow": [
+    "Fighting",
+    60
+  ],
+  "clangingscales": [
+    "Dragon",
+    110
+  ],
+  "clangoroussoul": [
+    "Dragon",
+    0
+  ],
+  "clearsmog": [
+    "Poison",
+    50
+  ],
+  "closecombat": [
+    "Fighting",
+    120
+  ],
+  "coaching": [
+    "Fighting",
+    0
+  ],
+  "coil": [
+    "Poison",
+    0
+  ],
+  "collisioncourse": [
+    "Fighting",
+    100
+  ],
+  "comeuppance": [
+    "Dark",
+    0
+  ],
+  "confide": [
+    "Normal",
+    0
+  ],
+  "confuseray": [
+    "Ghost",
+    0
+  ],
+  "confusion": [
+    "Psychic",
+    50
+  ],
+  "conversion": [
+    "Normal",
+    0
+  ],
+  "conversion2": [
+    "Normal",
+    0
+  ],
+  "copycat": [
+    "Normal",
+    0
+  ],
+  "cosmicpower": [
+    "Psychic",
+    0
+  ],
+  "cottonguard": [
+    "Grass",
+    0
+  ],
+  "cottonspore": [
+    "Grass",
+    0
+  ],
+  "counter": [
+    "Fighting",
+    0
+  ],
+  "courtchange": [
+    "Normal",
+    0
+  ],
+  "covet": [
+    "Normal",
+    60
+  ],
+  "crabhammer": [
+    "Water",
+    100
+  ],
+  "crosschop": [
+    "Fighting",
+    100
+  ],
+  "crosspoison": [
+    "Poison",
+    70
+  ],
+  "crunch": [
+    "Dark",
+    80
+  ],
+  "crushclaw": [
+    "Normal",
+    75
+  ],
+  "crushgrip": [
+    "Normal",
+    0
+  ],
+  "curse": [
+    "Ghost",
+    0
+  ],
+  "darkestlariat": [
+    "Dark",
+    85
+  ],
+  "darkpulse": [
+    "Dark",
+    80
+  ],
+  "darkvoid": [
+    "Dark",
+    0
+  ],
+  "dazzlinggleam": [
+    "Fairy",
+    80
+  ],
+  "decorate": [
+    "Fairy",
+    0
+  ],
+  "defendorder": [
+    "Bug",
+    0
+  ],
+  "defensecurl": [
+    "Normal",
+    0
+  ],
+  "defog": [
+    "Flying",
+    0
+  ],
+  "destinybond": [
+    "Ghost",
+    0
+  ],
+  "detect": [
+    "Fighting",
+    0
+  ],
+  "diamondstorm": [
+    "Rock",
+    100
+  ],
+  "dig": [
+    "Ground",
+    80
+  ],
+  "direclaw": [
+    "Poison",
+    80
+  ],
+  "disable": [
+    "Normal",
+    0
+  ],
+  "disarmingvoice": [
+    "Fairy",
+    40
+  ],
+  "discharge": [
+    "Electric",
+    80
+  ],
+  "dive": [
+    "Water",
+    80
+  ],
+  "doodle": [
+    "Normal",
+    0
+  ],
+  "doomdesire": [
+    "Steel",
+    140
+  ],
+  "doubleedge": [
+    "Normal",
+    120
+  ],
+  "doublehit": [
+    "Normal",
+    35
+  ],
+  "doublekick": [
+    "Fighting",
+    30
+  ],
+  "doubleshock": [
+    "Electric",
+    120
+  ],
+  "doubleteam": [
+    "Normal",
+    0
+  ],
+  "dracometeor": [
+    "Dragon",
+    130
+  ],
+  "dragonascent": [
+    "Flying",
+    120
+  ],
+  "dragonbreath": [
+    "Dragon",
+    60
+  ],
+  "dragoncheer": [
+    "Dragon",
+    0
+  ],
+  "dragonclaw": [
+    "Dragon",
+    80
+  ],
+  "dragondance": [
+    "Dragon",
+    0
+  ],
+  "dragondarts": [
+    "Dragon",
+    50
+  ],
+  "dragonenergy": [
+    "Dragon",
+    150
+  ],
+  "dragonhammer": [
+    "Dragon",
+    90
+  ],
+  "dragonpulse": [
+    "Dragon",
+    85
+  ],
+  "dragonrush": [
+    "Dragon",
+    100
+  ],
+  "dragontail": [
+    "Dragon",
+    60
+  ],
+  "drainingkiss": [
+    "Fairy",
+    50
+  ],
+  "drainpunch": [
+    "Fighting",
+    75
+  ],
+  "dreameater": [
+    "Psychic",
+    100
+  ],
+  "drillpeck": [
+    "Flying",
+    80
+  ],
+  "drillrun": [
+    "Ground",
+    80
+  ],
+  "drumbeating": [
+    "Grass",
+    80
+  ],
+  "dualwingbeat": [
+    "Flying",
+    40
+  ],
+  "dynamaxcannon": [
+    "Dragon",
+    100
+  ],
+  "dynamicpunch": [
+    "Fighting",
+    100
+  ],
+  "earthpower": [
+    "Ground",
+    90
+  ],
+  "earthquake": [
+    "Ground",
+    100
+  ],
+  "echoedvoice": [
+    "Normal",
+    40
+  ],
+  "eerieimpulse": [
+    "Electric",
+    0
+  ],
+  "eeriespell": [
+    "Psychic",
+    80
+  ],
+  "electricterrain": [
+    "Electric",
+    0
+  ],
+  "electroball": [
+    "Electric",
+    0
+  ],
+  "electrodrift": [
+    "Electric",
+    100
+  ],
+  "electroshot": [
+    "Electric",
+    130
+  ],
+  "electroweb": [
+    "Electric",
+    55
+  ],
+  "ember": [
+    "Fire",
+    40
+  ],
+  "encore": [
+    "Normal",
+    0
+  ],
+  "endeavor": [
+    "Normal",
+    0
+  ],
+  "endure": [
+    "Normal",
+    0
+  ],
+  "energyball": [
+    "Grass",
+    90
+  ],
+  "entrainment": [
+    "Normal",
+    0
+  ],
+  "eruption": [
+    "Fire",
+    150
+  ],
+  "esperwing": [
+    "Psychic",
+    80
+  ],
+  "expandingforce": [
+    "Psychic",
+    80
+  ],
+  "explosion": [
+    "Normal",
+    250
+  ],
+  "extrasensory": [
+    "Psychic",
+    80
+  ],
+  "extremespeed": [
+    "Normal",
+    80
+  ],
+  "facade": [
+    "Normal",
+    70
+  ],
+  "fairylock": [
+    "Fairy",
+    0
+  ],
+  "fairywind": [
+    "Fairy",
+    40
+  ],
+  "fakeout": [
+    "Normal",
+    40
+  ],
+  "faketears": [
+    "Dark",
+    0
+  ],
+  "falsesurrender": [
+    "Dark",
+    80
+  ],
+  "falseswipe": [
+    "Normal",
+    40
+  ],
+  "featherdance": [
+    "Flying",
+    0
+  ],
+  "feint": [
+    "Normal",
+    30
+  ],
+  "fellstinger": [
+    "Bug",
+    50
+  ],
+  "ficklebeam": [
+    "Dragon",
+    80
+  ],
+  "fierydance": [
+    "Fire",
+    80
+  ],
+  "fierywrath": [
+    "Dark",
+    90
+  ],
+  "filletaway": [
+    "Normal",
+    0
+  ],
+  "finalgambit": [
+    "Fighting",
+    0
+  ],
+  "fireblast": [
+    "Fire",
+    110
+  ],
+  "firefang": [
+    "Fire",
+    65
+  ],
+  "firelash": [
+    "Fire",
+    80
+  ],
+  "firepledge": [
+    "Fire",
+    80
+  ],
+  "firepunch": [
+    "Fire",
+    75
+  ],
+  "firespin": [
+    "Fire",
+    35
+  ],
+  "firstimpression": [
+    "Bug",
+    90
+  ],
+  "fissure": [
+    "Ground",
+    0
+  ],
+  "flail": [
+    "Normal",
+    0
+  ],
+  "flamecharge": [
+    "Fire",
+    50
+  ],
+  "flamethrower": [
+    "Fire",
+    90
+  ],
+  "flamewheel": [
+    "Fire",
+    60
+  ],
+  "flareblitz": [
+    "Fire",
+    120
+  ],
+  "flashcannon": [
+    "Steel",
+    80
+  ],
+  "flatter": [
+    "Dark",
+    0
+  ],
+  "fleurcannon": [
+    "Fairy",
+    130
+  ],
+  "fling": [
+    "Dark",
+    0
+  ],
+  "flipturn": [
+    "Water",
+    60
+  ],
+  "floralhealing": [
+    "Fairy",
+    0
+  ],
+  "flowertrick": [
+    "Grass",
+    70
+  ],
+  "fly": [
+    "Flying",
+    90
+  ],
+  "flyingpress": [
+    "Fighting",
+    100
+  ],
+  "focusblast": [
+    "Fighting",
+    120
+  ],
+  "focusenergy": [
+    "Normal",
+    0
+  ],
+  "focuspunch": [
+    "Fighting",
+    150
+  ],
+  "followme": [
+    "Normal",
+    0
+  ],
+  "forcepalm": [
+    "Fighting",
+    60
+  ],
+  "forestscurse": [
+    "Grass",
+    0
+  ],
+  "foulplay": [
+    "Dark",
+    95
+  ],
+  "freezedry": [
+    "Ice",
+    70
+  ],
+  "freezeshock": [
+    "Ice",
+    140
+  ],
+  "freezingglare": [
+    "Psychic",
+    90
+  ],
+  "frenzyplant": [
+    "Grass",
+    150
+  ],
+  "frostbreath": [
+    "Ice",
+    60
+  ],
+  "furyattack": [
+    "Normal",
+    15
+  ],
+  "furycutter": [
+    "Bug",
+    40
+  ],
+  "furyswipes": [
+    "Normal",
+    18
+  ],
+  "fusionbolt": [
+    "Electric",
+    100
+  ],
+  "fusionflare": [
+    "Fire",
+    100
+  ],
+  "futuresight": [
+    "Psychic",
+    120
+  ],
+  "gastroacid": [
+    "Poison",
+    0
+  ],
+  "gigadrain": [
+    "Grass",
+    75
+  ],
+  "gigaimpact": [
+    "Normal",
+    150
+  ],
+  "gigatonhammer": [
+    "Steel",
+    160
+  ],
+  "glaciallance": [
+    "Ice",
+    120
+  ],
+  "glaciate": [
+    "Ice",
+    65
+  ],
+  "glaiverush": [
+    "Dragon",
+    120
+  ],
+  "glare": [
+    "Normal",
+    0
+  ],
+  "grassknot": [
+    "Grass",
+    0
+  ],
+  "grasspledge": [
+    "Grass",
+    80
+  ],
+  "grassyglide": [
+    "Grass",
+    55
+  ],
+  "grassyterrain": [
+    "Grass",
+    0
+  ],
+  "gravapple": [
+    "Grass",
+    80
+  ],
+  "gravity": [
+    "Psychic",
+    0
+  ],
+  "growl": [
+    "Normal",
+    0
+  ],
+  "growth": [
+    "Normal",
+    0
+  ],
+  "guardsplit": [
+    "Psychic",
+    0
+  ],
+  "guardswap": [
+    "Psychic",
+    0
+  ],
+  "guillotine": [
+    "Normal",
+    0
+  ],
+  "gunkshot": [
+    "Poison",
+    120
+  ],
+  "gust": [
+    "Flying",
+    40
+  ],
+  "gyroball": [
+    "Steel",
+    0
+  ],
+  "hammerarm": [
+    "Fighting",
+    100
+  ],
+  "happyhour": [
+    "Normal",
+    0
+  ],
+  "harden": [
+    "Normal",
+    0
+  ],
+  "hardpress": [
+    "Steel",
+    0
+  ],
+  "haze": [
+    "Ice",
+    0
+  ],
+  "headbutt": [
+    "Normal",
+    70
+  ],
+  "headlongrush": [
+    "Ground",
+    120
+  ],
+  "headsmash": [
+    "Rock",
+    150
+  ],
+  "healbell": [
+    "Normal",
+    0
+  ],
+  "healingwish": [
+    "Psychic",
+    0
+  ],
+  "healpulse": [
+    "Psychic",
+    0
+  ],
+  "heartswap": [
+    "Psychic",
+    0
+  ],
+  "heatcrash": [
+    "Fire",
+    0
+  ],
+  "heatwave": [
+    "Fire",
+    95
+  ],
+  "heavyslam": [
+    "Steel",
+    0
+  ],
+  "helpinghand": [
+    "Normal",
+    0
+  ],
+  "hex": [
+    "Ghost",
+    65
+  ],
+  "highhorsepower": [
+    "Ground",
+    95
+  ],
+  "highjumpkick": [
+    "Fighting",
+    130
+  ],
+  "honeclaws": [
+    "Dark",
+    0
+  ],
+  "hornattack": [
+    "Normal",
+    65
+  ],
+  "horndrill": [
+    "Normal",
+    0
+  ],
+  "hornleech": [
+    "Grass",
+    75
+  ],
+  "howl": [
+    "Normal",
+    0
+  ],
+  "hurricane": [
+    "Flying",
+    110
+  ],
+  "hydrocannon": [
+    "Water",
+    150
+  ],
+  "hydropump": [
+    "Water",
+    110
+  ],
+  "hydrosteam": [
+    "Water",
+    80
+  ],
+  "hyperbeam": [
+    "Normal",
+    150
+  ],
+  "hyperdrill": [
+    "Normal",
+    100
+  ],
+  "hyperspacefury": [
+    "Dark",
+    100
+  ],
+  "hyperspacehole": [
+    "Psychic",
+    80
+  ],
+  "hypervoice": [
+    "Normal",
+    90
+  ],
+  "hypnosis": [
+    "Psychic",
+    0
+  ],
+  "icebeam": [
+    "Ice",
+    90
+  ],
+  "iceburn": [
+    "Ice",
+    140
+  ],
+  "icefang": [
+    "Ice",
+    65
+  ],
+  "icehammer": [
+    "Ice",
+    100
+  ],
+  "icepunch": [
+    "Ice",
+    75
+  ],
+  "iceshard": [
+    "Ice",
+    40
+  ],
+  "icespinner": [
+    "Ice",
+    80
+  ],
+  "iciclecrash": [
+    "Ice",
+    85
+  ],
+  "iciclespear": [
+    "Ice",
+    25
+  ],
+  "icywind": [
+    "Ice",
+    55
+  ],
+  "imprison": [
+    "Psychic",
+    0
+  ],
+  "incinerate": [
+    "Fire",
+    60
+  ],
+  "infernalparade": [
+    "Ghost",
+    60
+  ],
+  "inferno": [
+    "Fire",
+    100
+  ],
+  "infestation": [
+    "Bug",
+    20
+  ],
+  "ingrain": [
+    "Grass",
+    0
+  ],
+  "instruct": [
+    "Psychic",
+    0
+  ],
+  "irondefense": [
+    "Steel",
+    0
+  ],
+  "ironhead": [
+    "Steel",
+    80
+  ],
+  "irontail": [
+    "Steel",
+    100
+  ],
+  "ivycudgel": [
+    "Grass",
+    100
+  ],
+  "jawlock": [
+    "Dark",
+    80
+  ],
+  "jetpunch": [
+    "Water",
+    60
+  ],
+  "judgment": [
+    "Normal",
+    100
+  ],
+  "junglehealing": [
+    "Grass",
+    0
+  ],
+  "knockoff": [
+    "Dark",
+    65
+  ],
+  "kowtowcleave": [
+    "Dark",
+    85
+  ],
+  "lashout": [
+    "Dark",
+    75
+  ],
+  "lastresort": [
+    "Normal",
+    140
+  ],
+  "lastrespects": [
+    "Ghost",
+    50
+  ],
+  "lavaplume": [
+    "Fire",
+    80
+  ],
+  "leafage": [
+    "Grass",
+    40
+  ],
+  "leafblade": [
+    "Grass",
+    90
+  ],
+  "leafstorm": [
+    "Grass",
+    130
+  ],
+  "leechlife": [
+    "Bug",
+    80
+  ],
+  "leechseed": [
+    "Grass",
+    0
+  ],
+  "leer": [
+    "Normal",
+    0
+  ],
+  "lick": [
+    "Ghost",
+    30
+  ],
+  "lifedew": [
+    "Water",
+    0
+  ],
+  "lightscreen": [
+    "Psychic",
+    0
+  ],
+  "liquidation": [
+    "Water",
+    85
+  ],
+  "lockon": [
+    "Normal",
+    0
+  ],
+  "lowkick": [
+    "Fighting",
+    0
+  ],
+  "lowsweep": [
+    "Fighting",
+    65
+  ],
+  "luminacrash": [
+    "Psychic",
+    80
+  ],
+  "lunarblessing": [
+    "Psychic",
+    0
+  ],
+  "lunardance": [
+    "Psychic",
+    0
+  ],
+  "lunge": [
+    "Bug",
+    80
+  ],
+  "lusterpurge": [
+    "Psychic",
+    95
+  ],
+  "machpunch": [
+    "Fighting",
+    40
+  ],
+  "magicalleaf": [
+    "Grass",
+    60
+  ],
+  "magicpowder": [
+    "Psychic",
+    0
+  ],
+  "magicroom": [
+    "Psychic",
+    0
+  ],
+  "magmastorm": [
+    "Fire",
+    100
+  ],
+  "magneticflux": [
+    "Electric",
+    0
+  ],
+  "magnetrise": [
+    "Electric",
+    0
+  ],
+  "makeitrain": [
+    "Steel",
+    120
+  ],
+  "malignantchain": [
+    "Poison",
+    100
+  ],
+  "matchagotcha": [
+    "Grass",
+    80
+  ],
+  "meanlook": [
+    "Normal",
+    0
+  ],
+  "megadrain": [
+    "Grass",
+    40
+  ],
+  "megahorn": [
+    "Bug",
+    120
+  ],
+  "megakick": [
+    "Normal",
+    120
+  ],
+  "megapunch": [
+    "Normal",
+    80
+  ],
+  "memento": [
+    "Dark",
+    0
+  ],
+  "metalburst": [
+    "Steel",
+    0
+  ],
+  "metalclaw": [
+    "Steel",
+    50
+  ],
+  "metalsound": [
+    "Steel",
+    0
+  ],
+  "meteorbeam": [
+    "Rock",
+    120
+  ],
+  "meteormash": [
+    "Steel",
+    90
+  ],
+  "metronome": [
+    "Normal",
+    0
+  ],
+  "mightycleave": [
+    "Rock",
+    95
+  ],
+  "milkdrink": [
+    "Normal",
+    0
+  ],
+  "mimic": [
+    "Normal",
+    0
+  ],
+  "minimize": [
+    "Normal",
+    0
+  ],
+  "mirrorcoat": [
+    "Psychic",
+    0
+  ],
+  "mist": [
+    "Ice",
+    0
+  ],
+  "mistball": [
+    "Psychic",
+    95
+  ],
+  "mistyexplosion": [
+    "Fairy",
+    100
+  ],
+  "mistyterrain": [
+    "Fairy",
+    0
+  ],
+  "moonblast": [
+    "Fairy",
+    95
+  ],
+  "moongeistbeam": [
+    "Ghost",
+    100
+  ],
+  "moonlight": [
+    "Fairy",
+    0
+  ],
+  "morningsun": [
+    "Normal",
+    0
+  ],
+  "mortalspin": [
+    "Poison",
+    30
+  ],
+  "mountaingale": [
+    "Ice",
+    100
+  ],
+  "muddywater": [
+    "Water",
+    90
+  ],
+  "mudshot": [
+    "Ground",
+    55
+  ],
+  "mudslap": [
+    "Ground",
+    20
+  ],
+  "mysticalfire": [
+    "Fire",
+    75
+  ],
+  "mysticalpower": [
+    "Psychic",
+    70
+  ],
+  "nastyplot": [
+    "Dark",
+    0
+  ],
+  "nightdaze": [
+    "Dark",
+    85
+  ],
+  "nightshade": [
+    "Ghost",
+    0
+  ],
+  "nightslash": [
+    "Dark",
+    70
+  ],
+  "nobleroar": [
+    "Normal",
+    0
+  ],
+  "noretreat": [
+    "Fighting",
+    0
+  ],
+  "nuzzle": [
+    "Electric",
+    20
+  ],
+  "orderup": [
+    "Dragon",
+    80
+  ],
+  "originpulse": [
+    "Water",
+    110
+  ],
+  "outrage": [
+    "Dragon",
+    120
+  ],
+  "overdrive": [
+    "Electric",
+    80
+  ],
+  "overheat": [
+    "Fire",
+    130
+  ],
+  "painsplit": [
+    "Normal",
+    0
+  ],
+  "paraboliccharge": [
+    "Electric",
+    65
+  ],
+  "partingshot": [
+    "Dark",
+    0
+  ],
+  "payback": [
+    "Dark",
+    50
+  ],
+  "payday": [
+    "Normal",
+    40
+  ],
+  "peck": [
+    "Flying",
+    35
+  ],
+  "perishsong": [
+    "Normal",
+    0
+  ],
+  "petalblizzard": [
+    "Grass",
+    90
+  ],
+  "petaldance": [
+    "Grass",
+    120
+  ],
+  "phantomforce": [
+    "Ghost",
+    90
+  ],
+  "photongeyser": [
+    "Psychic",
+    100
+  ],
+  "pinmissile": [
+    "Bug",
+    25
+  ],
+  "playnice": [
+    "Normal",
+    0
+  ],
+  "playrough": [
+    "Fairy",
+    90
+  ],
+  "pluck": [
+    "Flying",
+    60
+  ],
+  "poisonfang": [
+    "Poison",
+    50
+  ],
+  "poisongas": [
+    "Poison",
+    0
+  ],
+  "poisonjab": [
+    "Poison",
+    80
+  ],
+  "poisonpowder": [
+    "Poison",
+    0
+  ],
+  "poisonsting": [
+    "Poison",
+    15
+  ],
+  "poisontail": [
+    "Poison",
+    50
+  ],
+  "pollenpuff": [
+    "Bug",
+    90
+  ],
+  "poltergeist": [
+    "Ghost",
+    110
+  ],
+  "populationbomb": [
+    "Normal",
+    20
+  ],
+  "pounce": [
+    "Bug",
+    50
+  ],
+  "pound": [
+    "Normal",
+    40
+  ],
+  "powdersnow": [
+    "Ice",
+    40
+  ],
+  "powergem": [
+    "Rock",
+    80
+  ],
+  "powersplit": [
+    "Psychic",
+    0
+  ],
+  "powerswap": [
+    "Psychic",
+    0
+  ],
+  "powertrick": [
+    "Psychic",
+    0
+  ],
+  "powertrip": [
+    "Dark",
+    20
+  ],
+  "powerwhip": [
+    "Grass",
+    120
+  ],
+  "precipiceblades": [
+    "Ground",
+    120
+  ],
+  "present": [
+    "Normal",
+    0
+  ],
+  "prismaticlaser": [
+    "Psychic",
+    160
+  ],
+  "protect": [
+    "Normal",
+    0
+  ],
+  "psybeam": [
+    "Psychic",
+    65
+  ],
+  "psyblade": [
+    "Psychic",
+    80
+  ],
+  "psychic": [
+    "Psychic",
+    90
+  ],
+  "psychicfangs": [
+    "Psychic",
+    85
+  ],
+  "psychicnoise": [
+    "Psychic",
+    75
+  ],
+  "psychicterrain": [
+    "Psychic",
+    0
+  ],
+  "psychoboost": [
+    "Psychic",
+    140
+  ],
+  "psychocut": [
+    "Psychic",
+    70
+  ],
+  "psychup": [
+    "Normal",
+    0
+  ],
+  "psyshieldbash": [
+    "Psychic",
+    70
+  ],
+  "psyshock": [
+    "Psychic",
+    80
+  ],
+  "psystrike": [
+    "Psychic",
+    100
+  ],
+  "pyroball": [
+    "Fire",
+    120
+  ],
+  "quash": [
+    "Dark",
+    0
+  ],
+  "quickattack": [
+    "Normal",
+    40
+  ],
+  "quickguard": [
+    "Fighting",
+    0
+  ],
+  "quiverdance": [
+    "Bug",
+    0
+  ],
+  "ragefist": [
+    "Ghost",
+    50
+  ],
+  "ragepowder": [
+    "Bug",
+    0
+  ],
+  "ragingbull": [
+    "Normal",
+    90
+  ],
+  "ragingfury": [
+    "Fire",
+    120
+  ],
+  "raindance": [
+    "Water",
+    0
+  ],
+  "rapidspin": [
+    "Normal",
+    50
+  ],
+  "razorleaf": [
+    "Grass",
+    55
+  ],
+  "razorshell": [
+    "Water",
+    75
+  ],
+  "recover": [
+    "Normal",
+    0
+  ],
+  "recycle": [
+    "Normal",
+    0
+  ],
+  "reflect": [
+    "Psychic",
+    0
+  ],
+  "reflecttype": [
+    "Normal",
+    0
+  ],
+  "relicsong": [
+    "Normal",
+    75
+  ],
+  "rest": [
+    "Psychic",
+    0
+  ],
+  "retaliate": [
+    "Normal",
+    70
+  ],
+  "revelationdance": [
+    "Normal",
+    90
+  ],
+  "reversal": [
+    "Fighting",
+    0
+  ],
+  "revivalblessing": [
+    "Normal",
+    0
+  ],
+  "risingvoltage": [
+    "Electric",
+    70
+  ],
+  "roar": [
+    "Normal",
+    0
+  ],
+  "roaroftime": [
+    "Dragon",
+    150
+  ],
+  "rockblast": [
+    "Rock",
+    25
+  ],
+  "rockpolish": [
+    "Rock",
+    0
+  ],
+  "rockslide": [
+    "Rock",
+    75
+  ],
+  "rocksmash": [
+    "Fighting",
+    40
+  ],
+  "rockthrow": [
+    "Rock",
+    50
+  ],
+  "rocktomb": [
+    "Rock",
+    60
+  ],
+  "rockwrecker": [
+    "Rock",
+    150
+  ],
+  "roleplay": [
+    "Psychic",
+    0
+  ],
+  "rollout": [
+    "Rock",
+    30
+  ],
+  "roost": [
+    "Flying",
+    0
+  ],
+  "round": [
+    "Normal",
+    60
+  ],
+  "ruination": [
+    "Dark",
+    0
+  ],
+  "sacredfire": [
+    "Fire",
+    100
+  ],
+  "sacredsword": [
+    "Fighting",
+    90
+  ],
+  "safeguard": [
+    "Normal",
+    0
+  ],
+  "saltcure": [
+    "Rock",
+    40
+  ],
+  "sandattack": [
+    "Ground",
+    0
+  ],
+  "sandsearstorm": [
+    "Ground",
+    100
+  ],
+  "sandstorm": [
+    "Rock",
+    0
+  ],
+  "sandtomb": [
+    "Ground",
+    35
+  ],
+  "scald": [
+    "Water",
+    80
+  ],
+  "scaleshot": [
+    "Dragon",
+    25
+  ],
+  "scaryface": [
+    "Normal",
+    0
+  ],
+  "scorchingsands": [
+    "Ground",
+    70
+  ],
+  "scratch": [
+    "Normal",
+    40
+  ],
+  "screech": [
+    "Normal",
+    0
+  ],
+  "secretsword": [
+    "Fighting",
+    85
+  ],
+  "seedbomb": [
+    "Grass",
+    80
+  ],
+  "seedflare": [
+    "Grass",
+    120
+  ],
+  "seismictoss": [
+    "Fighting",
+    0
+  ],
+  "selfdestruct": [
+    "Normal",
+    200
+  ],
+  "shadowball": [
+    "Ghost",
+    80
+  ],
+  "shadowclaw": [
+    "Ghost",
+    70
+  ],
+  "shadowforce": [
+    "Ghost",
+    120
+  ],
+  "shadowpunch": [
+    "Ghost",
+    60
+  ],
+  "shadowsneak": [
+    "Ghost",
+    40
+  ],
+  "shedtail": [
+    "Normal",
+    0
+  ],
+  "sheercold": [
+    "Ice",
+    0
+  ],
+  "shellsidearm": [
+    "Poison",
+    90
+  ],
+  "shellsmash": [
+    "Normal",
+    0
+  ],
+  "shelter": [
+    "Steel",
+    0
+  ],
+  "shiftgear": [
+    "Steel",
+    0
+  ],
+  "shockwave": [
+    "Electric",
+    60
+  ],
+  "shoreup": [
+    "Ground",
+    0
+  ],
+  "silktrap": [
+    "Bug",
+    0
+  ],
+  "simplebeam": [
+    "Normal",
+    0
+  ],
+  "sing": [
+    "Normal",
+    0
+  ],
+  "sketch": [
+    "Normal",
+    0
+  ],
+  "skillswap": [
+    "Psychic",
+    0
+  ],
+  "skittersmack": [
+    "Bug",
+    70
+  ],
+  "skyattack": [
+    "Flying",
+    140
+  ],
+  "slackoff": [
+    "Normal",
+    0
+  ],
+  "slam": [
+    "Normal",
+    80
+  ],
+  "slash": [
+    "Normal",
+    70
+  ],
+  "sleeppowder": [
+    "Grass",
+    0
+  ],
+  "sleeptalk": [
+    "Normal",
+    0
+  ],
+  "sludge": [
+    "Poison",
+    65
+  ],
+  "sludgebomb": [
+    "Poison",
+    90
+  ],
+  "sludgewave": [
+    "Poison",
+    95
+  ],
+  "smackdown": [
+    "Rock",
+    50
+  ],
+  "smartstrike": [
+    "Steel",
+    70
+  ],
+  "smog": [
+    "Poison",
+    30
+  ],
+  "smokescreen": [
+    "Normal",
+    0
+  ],
+  "snarl": [
+    "Dark",
+    55
+  ],
+  "snipeshot": [
+    "Water",
+    80
+  ],
+  "snore": [
+    "Normal",
+    50
+  ],
+  "snowscape": [
+    "Ice",
+    0
+  ],
+  "soak": [
+    "Water",
+    0
+  ],
+  "softboiled": [
+    "Normal",
+    0
+  ],
+  "solarbeam": [
+    "Grass",
+    120
+  ],
+  "solarblade": [
+    "Grass",
+    125
+  ],
+  "spacialrend": [
+    "Dragon",
+    100
+  ],
+  "spark": [
+    "Electric",
+    65
+  ],
+  "sparklingaria": [
+    "Water",
+    90
+  ],
+  "speedswap": [
+    "Psychic",
+    0
+  ],
+  "spicyextract": [
+    "Grass",
+    0
+  ],
+  "spikes": [
+    "Ground",
+    0
+  ],
+  "spikyshield": [
+    "Grass",
+    0
+  ],
+  "spinout": [
+    "Steel",
+    100
+  ],
+  "spiritbreak": [
+    "Fairy",
+    75
+  ],
+  "spiritshackle": [
+    "Ghost",
+    80
+  ],
+  "spite": [
+    "Ghost",
+    0
+  ],
+  "spitup": [
+    "Normal",
+    0
+  ],
+  "splash": [
+    "Normal",
+    0
+  ],
+  "spore": [
+    "Grass",
+    0
+  ],
+  "springtidestorm": [
+    "Fairy",
+    100
+  ],
+  "stealthrock": [
+    "Rock",
+    0
+  ],
+  "steameruption": [
+    "Water",
+    110
+  ],
+  "steelbeam": [
+    "Steel",
+    140
+  ],
+  "steelroller": [
+    "Steel",
+    130
+  ],
+  "steelwing": [
+    "Steel",
+    70
+  ],
+  "stickyweb": [
+    "Bug",
+    0
+  ],
+  "stockpile": [
+    "Normal",
+    0
+  ],
+  "stomp": [
+    "Normal",
+    65
+  ],
+  "stompingtantrum": [
+    "Ground",
+    75
+  ],
+  "stoneaxe": [
+    "Rock",
+    65
+  ],
+  "stoneedge": [
+    "Rock",
+    100
+  ],
+  "storedpower": [
+    "Psychic",
+    20
+  ],
+  "strangesteam": [
+    "Fairy",
+    90
+  ],
+  "strength": [
+    "Normal",
+    80
+  ],
+  "strengthsap": [
+    "Grass",
+    0
+  ],
+  "stringshot": [
+    "Bug",
+    0
+  ],
+  "struggle": [
+    "Normal",
+    50
+  ],
+  "strugglebug": [
+    "Bug",
+    50
+  ],
+  "stuffcheeks": [
+    "Normal",
+    0
+  ],
+  "stunspore": [
+    "Grass",
+    0
+  ],
+  "substitute": [
+    "Normal",
+    0
+  ],
+  "suckerpunch": [
+    "Dark",
+    70
+  ],
+  "sunnyday": [
+    "Fire",
+    0
+  ],
+  "sunsteelstrike": [
+    "Steel",
+    100
+  ],
+  "supercellslam": [
+    "Electric",
+    100
+  ],
+  "superfang": [
+    "Normal",
+    0
+  ],
+  "superpower": [
+    "Fighting",
+    120
+  ],
+  "supersonic": [
+    "Normal",
+    0
+  ],
+  "surf": [
+    "Water",
+    90
+  ],
+  "surgingstrikes": [
+    "Water",
+    25
+  ],
+  "swagger": [
+    "Normal",
+    0
+  ],
+  "swallow": [
+    "Normal",
+    0
+  ],
+  "sweetkiss": [
+    "Fairy",
+    0
+  ],
+  "sweetscent": [
+    "Normal",
+    0
+  ],
+  "swift": [
+    "Normal",
+    60
+  ],
+  "switcheroo": [
+    "Dark",
+    0
+  ],
+  "swordsdance": [
+    "Normal",
+    0
+  ],
+  "synthesis": [
+    "Grass",
+    0
+  ],
+  "syrupbomb": [
+    "Grass",
+    60
+  ],
+  "tachyoncutter": [
+    "Steel",
+    50
+  ],
+  "tackle": [
+    "Normal",
+    40
+  ],
+  "tailglow": [
+    "Bug",
+    0
+  ],
+  "tailslap": [
+    "Normal",
+    25
+  ],
+  "tailwhip": [
+    "Normal",
+    0
+  ],
+  "tailwind": [
+    "Flying",
+    0
+  ],
+  "takedown": [
+    "Normal",
+    90
+  ],
+  "takeheart": [
+    "Psychic",
+    0
+  ],
+  "tarshot": [
+    "Rock",
+    0
+  ],
+  "taunt": [
+    "Dark",
+    0
+  ],
+  "tearfullook": [
+    "Normal",
+    0
+  ],
+  "teatime": [
+    "Normal",
+    0
+  ],
+  "teeterdance": [
+    "Normal",
+    0
+  ],
+  "teleport": [
+    "Psychic",
+    0
+  ],
+  "temperflare": [
+    "Fire",
+    75
+  ],
+  "terablast": [
+    "Normal",
+    80
+  ],
+  "terastarstorm": [
+    "Normal",
+    120
+  ],
+  "terrainpulse": [
+    "Normal",
+    50
+  ],
+  "thief": [
+    "Dark",
+    60
+  ],
+  "thrash": [
+    "Normal",
+    120
+  ],
+  "throatchop": [
+    "Dark",
+    80
+  ],
+  "thunder": [
+    "Electric",
+    110
+  ],
+  "thunderbolt": [
+    "Electric",
+    90
+  ],
+  "thundercage": [
+    "Electric",
+    80
+  ],
+  "thunderclap": [
+    "Electric",
+    70
+  ],
+  "thunderfang": [
+    "Electric",
+    65
+  ],
+  "thunderouskick": [
+    "Fighting",
+    90
+  ],
+  "thunderpunch": [
+    "Electric",
+    75
+  ],
+  "thundershock": [
+    "Electric",
+    40
+  ],
+  "thunderwave": [
+    "Electric",
+    0
+  ],
+  "tickle": [
+    "Normal",
+    0
+  ],
+  "tidyup": [
+    "Normal",
+    0
+  ],
+  "topsyturvy": [
+    "Dark",
+    0
+  ],
+  "torchsong": [
+    "Fire",
+    80
+  ],
+  "torment": [
+    "Dark",
+    0
+  ],
+  "toxic": [
+    "Poison",
+    0
+  ],
+  "toxicspikes": [
+    "Poison",
+    0
+  ],
+  "toxicthread": [
+    "Poison",
+    0
+  ],
+  "trailblaze": [
+    "Grass",
+    50
+  ],
+  "transform": [
+    "Normal",
+    0
+  ],
+  "triattack": [
+    "Normal",
+    80
+  ],
+  "trick": [
+    "Psychic",
+    0
+  ],
+  "trickroom": [
+    "Psychic",
+    0
+  ],
+  "triplearrows": [
+    "Fighting",
+    90
+  ],
+  "tripleaxel": [
+    "Ice",
+    20
+  ],
+  "tripledive": [
+    "Water",
+    30
+  ],
+  "triplekick": [
+    "Fighting",
+    10
+  ],
+  "tropkick": [
+    "Grass",
+    70
+  ],
+  "twinbeam": [
+    "Psychic",
+    40
+  ],
+  "twister": [
+    "Dragon",
+    40
+  ],
+  "upperhand": [
+    "Fighting",
+    65
+  ],
+  "uproar": [
+    "Normal",
+    90
+  ],
+  "uturn": [
+    "Bug",
+    70
+  ],
+  "vacuumwave": [
+    "Fighting",
+    40
+  ],
+  "venoshock": [
+    "Poison",
+    65
+  ],
+  "victorydance": [
+    "Fighting",
+    0
+  ],
+  "vinewhip": [
+    "Grass",
+    45
+  ],
+  "visegrip": [
+    "Normal",
+    55
+  ],
+  "voltswitch": [
+    "Electric",
+    70
+  ],
+  "volttackle": [
+    "Electric",
+    120
+  ],
+  "waterfall": [
+    "Water",
+    80
+  ],
+  "watergun": [
+    "Water",
+    40
+  ],
+  "waterpledge": [
+    "Water",
+    80
+  ],
+  "waterpulse": [
+    "Water",
+    60
+  ],
+  "watershuriken": [
+    "Water",
+    15
+  ],
+  "waterspout": [
+    "Water",
+    150
+  ],
+  "wavecrash": [
+    "Water",
+    120
+  ],
+  "weatherball": [
+    "Normal",
+    50
+  ],
+  "whirlpool": [
+    "Water",
+    35
+  ],
+  "whirlwind": [
+    "Normal",
+    0
+  ],
+  "wickedblow": [
+    "Dark",
+    75
+  ],
+  "wideguard": [
+    "Rock",
+    0
+  ],
+  "wildboltstorm": [
+    "Electric",
+    100
+  ],
+  "wildcharge": [
+    "Electric",
+    90
+  ],
+  "willowisp": [
+    "Fire",
+    0
+  ],
+  "wingattack": [
+    "Flying",
+    60
+  ],
+  "wish": [
+    "Normal",
+    0
+  ],
+  "withdraw": [
+    "Water",
+    0
+  ],
+  "wonderroom": [
+    "Psychic",
+    0
+  ],
+  "woodhammer": [
+    "Grass",
+    120
+  ],
+  "workup": [
+    "Normal",
+    0
+  ],
+  "worryseed": [
+    "Grass",
+    0
+  ],
+  "wrap": [
+    "Normal",
+    15
+  ],
+  "xscissor": [
+    "Bug",
+    80
+  ],
+  "yawn": [
+    "Normal",
+    0
+  ],
+  "zapcannon": [
+    "Electric",
+    120
+  ],
+  "zenheadbutt": [
+    "Psychic",
+    80
+  ],
+  "zingzap": [
+    "Electric",
+    80
+  ]
+}
