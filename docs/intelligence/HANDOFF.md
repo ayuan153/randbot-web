@@ -102,8 +102,9 @@ Other gotchas:
 - Never commit credentials; `.gitignore` covers `.env*`.
 
 ## Next steps (prioritized)
-1. **Clean ladder re-measure** from a residential IP (`npx tsx ladder/client.ts 40`). The current 30.4 is mildly contaminated by the (now-fixed) disconnect-forfeit bug; a clean run gives the true baseline.
-2. **Raise strength (the real lever).** GXE 30.4 says the approach is weak. Candidates, roughly in ROI order:
+1. **Clean ladder re-measure** from a residential IP (`npx tsx ladder/client.ts 40`). The current 30.4 is contaminated by the (now-fixed) disconnect-forfeit bug + the datacenter-IP proxy lock; a clean run gives the true baseline. **Do this first — it's nearly free and the result changes everything downstream.**
+   - **Also sanity-check harness fidelity (do before investing in a bigger net):** the ladder builds a `BattleSnapshot` from raw protocol (`ladder/battle-state.ts`), whereas the extension builds it from the page `battle` object (`src/state/snapshot.ts`). If the protocol-reconstructed snapshot is lossy (degraded opponent model / features), the live GXE *understates* the real bot and we'd be optimizing the wrong thing. Verify by comparing the snapshot/features the harness produces vs the extension for the same battle state (e.g. log a few decisions and diff).
+2. **Raise strength (the real lever) — only after #1 confirms the number is real.** GXE 30.4 says the approach is weak. Recommended order: **search → blend tuning → stronger net → ISMCTS.** Candidates:
    - Search: iterative deepening + move ordering, push to depth 3–4 (Phase 2 in the plan); tune `POLICY_BLEND` (0.7) / `ML_BLEND` (0.5).
    - Net: bigger/better policy+value net; train on higher-rated replays / more data; richer features.
    - Phase 3: ISMCTS guided by the policy net.
